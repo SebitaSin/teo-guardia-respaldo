@@ -1,0 +1,30 @@
+# Local proposal. Creating this paid service still requires approval of its price.
+services:
+  - type: web
+    name: guardia-schestakow
+    runtime: docker
+    plan: 0.5c-512mb
+    region: virginia
+    numInstances: 1
+    dockerfilePath: ./Dockerfile
+    autoDeployTrigger: off
+    healthCheckPath: /api/health
+    disk:
+      name: guardia-datos
+      mountPath: /var/data
+      sizeGB: 2
+    envVars:
+      - key: GUARDIA_MODE
+        value: preparacion
+      - key: GMAIL_SYNC_ENABLED
+        value: "false"
+      - key: GMAIL_SYNC_MINUTES
+        value: "1440"
+      - key: AI_ENABLED
+        value: "false"
+      - key: AI_COMPARE
+        value: "false"
+      - key: APP_COOKIE_SECURE
+        value: "true"
+      - key: APP_TRUST_PROXY
+        value: "true"

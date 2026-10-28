@@ -44,21 +44,33 @@ test("una celda lejana sólo es alerta si es considerable y viene hacia la ciuda
   assert.deepEqual(far({ km: 49 }, null), []); // lejos y sin saber hacia dónde va
   assert.deepEqual(far({ km: 25 }, fromSouth), [5]);
   assert.deepEqual(far({ km: 25, dbz: 55 }, fromSouth), [4]);
-  assert.deepEqual(far({ km: 25 }, null), [4]);
+  assert.deepEqual(far({ km: 25 }, null), [2]);
   assert.deepEqual(far({ km: 25, nucleo_km2: 3 }, fromSouth), []); // núcleo chico
-  assert.deepEqual(far({ km: 25 }, { dir: 185, kmh: 5 }), [4]); // casi sin viento: no se va, puede quedarse descargando
+  assert.deepEqual(far({ km: 25 }, { dir: 185, kmh: 5 }), [2]); // sin trayectoria comprobada: información regional
   assert.deepEqual(far({ km: 49 }, { dir: 185, kmh: 5 }), []);
   assert.deepEqual(far({ km: 104 }, fromSouth), []);
-  assert.match(radarAlerts({ ciudad: { km2_45: 0, km2_54: 0, km2_60: 0 }, celda: { km: 40, rumbo: "S", grados: 180, nucleo_km2: 8, dbz: 60 } }, at, fromSouth)[0].detalle, /llegaría en 60 minutos/);
+  assert.match(radarAlerts({ ciudad: { km2_45: 0, km2_54: 0, km2_60: 0 }, celda: { km: 40, rumbo: "S", grados: 180, nucleo_km2: 8, dbz: 60 } }, at, fromSouth)[0].detalle, /no es movimiento medido/);
   assert.throws(() => analyzeRadar(new Uint8Array([1, 2, 3])));
 });
 
-test("celda fuerte que no se mueve durante tres barridos: lluvia sostenida aguas arriba", () => {
+test("una celda estacionaria fuera de la ciudad no demuestra un aluvión hacia San Rafael", () => {
   const at = "2026-10-06T21:30:00Z";
   const scan = (km) => ({ ciudad: { km2_45: 0, km2_54: 0, km2_60: 0, km2_60_8km: 0 }, celda: { km, dbz: 57, nucleo_km2: 9, km2: 50, grados: 250, rumbo: "O" } });
   const stuck = radarAlerts(scan(28), at, { dir: 250, kmh: 8 }, [scan(28), scan(28), scan(29)]);
-  assert.deepEqual([stuck.length, stuck[0].sostenida, stuck[0].grado], [1, true, 3]);
-  assert.match(stuck[0].titulo, /Lluvia sostenida a 28 km al O/);
+  assert.deepEqual([stuck.length, stuck[0].sostenida, stuck[0].grado, stuck[0].afecta_ciudad], [1, true, 2, false]);
+  assert.match(stuck[0].titulo, /Eco persistente a 28 km al O/);
   assert.equal(radarAlerts(scan(20), at, { dir: 250, kmh: 40 }, [scan(20), scan(30), scan(40)]).some((alert) => alert.sostenida), false); // se acerca: no es "quieta"
   assert.equal(radarAlerts(scan(28), at, null, [scan(28), scan(28)]).some((alert) => alert.sostenida), false); // dos barridos no alcanzan
+});
+
+test("el barrido actual despejado invalida la persistencia de dos núcleos intensos anteriores", () => {
+  const storm = { ciudad: { km2_45: 150, km2_54: 60, km2_60: 40, km2_60_8km: 27 }, celda: null };
+  const calm = { ciudad: { km2_45: 0, km2_54: 0, km2_60: 0, km2_60_8km: 0 }, celda: null };
+  assert.deepEqual(radarAlerts(calm, "2026-10-26T20:00:00Z", null, [calm, storm, storm]), []);
+});
+
+test("una trayectoria que pasa a 35 km de la ciudad no se presenta como amenaza local", () => {
+  const reading = { ciudad: {}, celda: { km: 50, grados: 180, rumbo: "S", dbz: 60, nucleo_km2: 8 } };
+  assert.deepEqual(radarAlerts(reading, "2026-10-26T20:00:00Z", { dir: 225, kmh: 40 }), []);
+  assert.equal(radarAlerts(reading, "2026-10-26T20:00:00Z", { dir: 180, kmh: 40 }).length, 1);
 });

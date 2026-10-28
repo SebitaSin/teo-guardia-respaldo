@@ -34,7 +34,7 @@ function precipHazard(w: WeatherState): { H: number; why: string[] } {
   }
   if (hail) {
     H = Math.max(H, 70);
-    why.push("Granizo (código WMO 96/99)");
+    why.push("Condiciones de granizo previstas por el modelo (código WMO 96/99)");
   }
   if (wind >= 70) {
     H = Math.max(H, 65);

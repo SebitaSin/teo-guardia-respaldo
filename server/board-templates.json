@@ -236,7 +236,7 @@
    "alias": [
     "UCO"
    ],
-   "camas_sin_confirmar": true,
+   "camas_sin_confirmar": false,
    "columnas": [
     "CAMA",
     "APELLIDO Y NOMBRE",

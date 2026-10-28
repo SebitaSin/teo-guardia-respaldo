@@ -19,6 +19,7 @@ import {
   waMeLink,
   validateOutbound,
 } from "./whatsapp-send.mjs";
+import { saveConsent } from "./whatsapp-consent.mjs";
 import { whatsappCanSend, whatsappReady } from "./whatsapp.mjs";
 
 const SECRET = "x".repeat(48);
@@ -33,7 +34,9 @@ const CONFIG = {
 function freshDir(inbound = []) {
   const dir = mkdtempSync(join(tmpdir(), "wa-out-"));
   mkdirSync(join(dir, "whatsapp"), { recursive: true });
-  writeFileSync(join(dir, "whatsapp", "inbox.json"), JSON.stringify(inbound), "utf8");
+  writeFileSync(join(dir, "whatsapp", "inbox.json"), JSON.stringify(inbound.map(item => ({ ...item, source: "WHATSAPP_CLOUD_API", mensaje_en: item.recibido_en }))), "utf8");
+  saveConsent(dir, SECRET, { phone: "2604604804", active: true, evidence: "Consentimiento explícito del fixture de prueba" }, "test");
+  saveConsent(dir, SECRET, { phone: "2604056998", active: true, evidence: "Consentimiento explícito del fixture de prueba" }, "test");
   return dir;
 }
 
@@ -97,16 +100,13 @@ test("texto libre fuera de ventana se rechaza sin llamar a Meta", async () => {
   assert.equal(readOutbox(dir, SECRET)[0].estado, "FALLIDO");
 });
 
-test("sin webhook la app no bloquea el texto: decide Meta", async () => {
+test("sin webhook el texto queda bloqueado sin ventana verificable", async () => {
   const dir = freshDir([]);
   const record = queueOutbound(dir, SECRET, { to: "2604056998", kind: "text", body: "hola", motivo: "prueba" }, "coord");
   approveOutbound(dir, SECRET, record.id, "direccion");
   const impl = okFetch();
-  const sendOnly = { accessToken: "token", phoneNumberId: "111222333", graphVersion: "v23.0", verifyToken: "", appSecret: "" };
-  const sent = await deliverOutbound({ dataDir: dir, secret: SECRET, id: record.id, config: sendOnly, fetchImpl: impl });
-  assert.equal(sent.estado, "ENVIADO");
-  assert.equal(impl.calls.length, 1);
-  assert.equal(impl.calls[0].payload.type, "text");
+  await assert.rejects(deliverOutbound({ dataDir: dir, secret: SECRET, id: record.id, config: { ...CONFIG, appSecret: "" }, fetchImpl: impl }), /service_window_closed/);
+  assert.equal(impl.calls.length, 0);
 });
 
 test("la plantilla sale aunque la ventana esté cerrada", async () => {
@@ -223,7 +223,7 @@ test("el canal manual sale sin ventana de servicio y sin token", () => {
   const record = queueOutbound(dir, SECRET, { to: "2604056998", kind: "text", body: "Cambio de guardia", motivo: "aviso" }, "coord");
   approveOutbound(dir, SECRET, record.id, "direccion");
   const sent = deliverManual(dir, SECRET, record.id, "direccion");
-  assert.equal(sent.estado, "ENVIADO");
+  assert.equal(sent.estado, "ENLACE_ABIERTO");
   assert.equal(sent.canal, "MANUAL");
   assert.equal(sent.acuse_disponible, false);
   assert.equal(sent.link, "https://wa.me/5492604056998?text=Cambio%20de%20guardia");

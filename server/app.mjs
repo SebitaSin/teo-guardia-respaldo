@@ -1,9 +1,12 @@
 import { createServer } from "node:http";
-import { extname, join, normalize, resolve, sep } from "node:path";
+import { dirname, extname, join, normalize, resolve, sep } from "node:path";
 import { existsSync, readFileSync, statSync } from "node:fs";
 import { appendAudit, readJson, writeJsonAtomic } from "./store.mjs";
 import { clearSessionCookie, issueSession, parseCookie, readSession, sessionCookie, verifyPassword } from "./auth.mjs";
 import { findWhatsAppMedia, receiveWhatsApp, whatsappCanSend, whatsappInbox, whatsappReady } from "./whatsapp.mjs";
+import { createMessagingWorkflow } from "./messaging-workflow.mjs";
+import { readConsents, saveConsent } from "./whatsapp-consent.mjs";
+import { whatsappTokenStatus } from "./whatsapp-health.mjs";
 import { applyStatusUpdates, approveOutbound, deliverOutbound, outboxSummary, queueOutbound, readOutbox, rejectOutbound, serviceWindowStatus } from "./whatsapp-send.mjs";
 import { cancelSchedule, createSchedule, readSchedules } from "./whatsapp-schedules.mjs";
 import { aiReady, aiUsageStatus, analyzeBoardImage, verifyOpenAi } from "./ai.mjs";
@@ -14,11 +17,13 @@ import { deletePrivateLocation, readPrivateLocations, setSolidario, upsertPrivat
 import { deletePrivateContact, readPrivateContacts, upsertPrivateContact } from "./private-contacts.mjs";
 import { originalStaff, staffDirectory } from "./staff-directory.mjs";
 import { readStaffGroups, saveStaffGroup, deleteStaffGroup, saveGroupDraft } from "./staff-groups.mjs";
-import { geocodeWithGoogle } from "./maps.mjs";
+import { computeRouteWithGoogle, geocodeWithGoogle } from "./maps.mjs";
 import { createAutogestion } from "./autogestion.mjs";
 import { communicationsInbox, reviewCommunication, saveManualCommunication } from "./communications.mjs";
 import { verifyBoardRows } from "./board-verification.mjs";
 import { confirmBed, readBoards } from "./boards.mjs";
+import { readClaimState, setClaimRecipients } from "./claim-controls.mjs";
+import { applyBedCapacity } from "../src/data/bed-capacity.mjs";
 import { applyLearnedCorrections, correctionStatus, recordBoardCorrections } from "./corrections.mjs";
 
 const MIME = new Map([
@@ -45,7 +50,7 @@ function securityHeaders(res) {
   res.setHeader("referrer-policy", "strict-origin-when-cross-origin");
   res.setHeader("permissions-policy", "camera=(), microphone=(), geolocation=()");
   res.setHeader("strict-transport-security", "max-age=31536000; includeSubDomains");
-  res.setHeader("content-security-policy", "default-src 'self'; img-src 'self' data: blob: https://gibs.earthdata.nasa.gov https://www2.contingencias.mendoza.gov.ar https://maps.gstatic.com https://*.googleapis.com https://*.ggpht.com; style-src 'self' 'unsafe-inline'; script-src 'self' https://maps.googleapis.com; connect-src 'self' https://api.open-meteo.com https://maps.googleapis.com https://routes.googleapis.com https://maps.gstatic.com; frame-src https://embed.waze.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
+  res.setHeader("content-security-policy", "default-src 'self'; img-src 'self' data: blob: https://gibs.earthdata.nasa.gov https://www2.contingencias.mendoza.gov.ar https://maps.gstatic.com https://*.googleapis.com https://*.ggpht.com; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src 'self' https://fonts.gstatic.com; script-src 'self' https://maps.googleapis.com; connect-src 'self' https://api.open-meteo.com https://maps.googleapis.com https://routes.googleapis.com https://maps.gstatic.com; frame-src https://embed.waze.com; object-src 'none'; frame-ancestors 'none'; base-uri 'self'; form-action 'self'");
 }
 
 async function readBody(req, maxBytes = 16_384) {
@@ -124,6 +129,7 @@ function findMailAttachment(dataDir, id) {
 
 export function createHospitalServer({ distDir, dataDir, catalogFile = null, internacionFile = null, authConfig, waConfig, ai = { enabled: false }, maps = { browserKey: "", serverKey: "" }, mailRunner = null, photoIntake = null, fetchImpl = fetch , weatherWatch = null}) {
   const failures = new Map();
+  const messaging = createMessagingWorkflow({ dataDir, secret: authConfig.secret, config: waConfig, fetchImpl });
   const autogestion = createAutogestion({ dataDir, secret: authConfig.secret, maps, fetchImpl });
   return createServer(async (req, res) => {
     securityHeaders(res);
@@ -133,6 +139,9 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
     const ip = forwarded || (req.socket.remoteAddress ?? "unknown");
     try {
       if (url.pathname === "/api/health" && req.method === "GET") return json(res, 200, { ok: true });
+      // Compartir GPS retirado por pedido de Sebastián: tampoco se acepta desde clientes anteriores.
+      if (url.pathname === "/api/continuidad/gps" || url.pathname.startsWith("/api/continuidad/gps/")) return json(res, 404, { error: "not_found" });
+      if (/^\/mi-ubicacion\/?$/.test(url.pathname)) return send(res, 404, "Página no disponible");
 
       if (url.pathname === "/api/whatsapp/webhook") {
         if (req.method === "GET") {
@@ -143,7 +152,16 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
         if (req.method === "POST") {
           const raw = await readBody(req, 10 * 1024 * 1024);
           const result = await receiveWhatsApp({ raw, signature: req.headers["x-hub-signature-256"], dataDir, config: waConfig, fetchImpl });
-          if (result.status === 200) applyStatusUpdates(dataDir, authConfig.secret, JSON.parse(raw.toString("utf8")));
+          if (result.status === 200) {
+            const payload = JSON.parse(raw.toString("utf8"));
+            for (const entry of payload.entry ?? []) for (const change of entry.changes ?? []) {
+              if (change.value?.metadata?.phone_number_id && String(change.value.metadata.phone_number_id) !== String(waConfig.phoneNumberId)) continue;
+              applyStatusUpdates(dataDir, authConfig.secret, { entry: [{ changes: [change] }] });
+              for (const message of change.value?.messages ?? []) if (/^(BAJA|STOP|CANCELAR|NO ME ESCRIBAN)$/i.test(String(message.text?.body ?? "").trim())) {
+                try { saveConsent(dataDir, authConfig.secret, { phone: message.from, active: false, evidence: "Baja explícita recibida por webhook firmado: " + String(message.id).slice(0, 200) }, "whatsapp-recipient"); } catch { /* remitente no normalizable: no autoriza envíos */ }
+              }
+            }
+          }
           return send(res, result.status, result.body);
         }
         return send(res, 405, "method");
@@ -186,9 +204,25 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
 
       if (url.pathname === "/api/logout" && req.method === "POST") {
         appendAudit(dataDir, { actor: user.id, role: user.role, action: "logout", kind: "security" });
-        return send(res, 303, "", "text/plain; charset=utf-8", { location: "/login", "set-cookie": clearSessionCookie(authConfig) });
+        return send(res, 303, "", "text/plain; charset=utf-8", { location: "/login", "set-cookie": clearSessionCookie(authConfig), "clear-site-data": '"cache", "storage"' });
       }
       if (url.pathname === "/api/session" && req.method === "GET") return json(res, 200, { id: user.id, name: user.name, role: user.role, roleLabel: roleLabels[user.role], staffId: user.staffId });
+      if (url.pathname === "/api/bootstrap" && req.method === "GET") {
+        if (user.role === "DRIVER") return json(res, 403, { error: "forbidden" });
+        const root = catalogFile ? dirname(catalogFile) : join(distDir, "..", "src", "data");
+        const clinical = hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"]);
+        const internacion = clinical ? readJson(internacionFile || join(root, "internacion.json"), { beds: [], notes: {} }) : { beds: [], notes: {}, fecha: "Sin permiso clínico", hora: "", fuente: "" };
+        const result = {
+          catalog: readJson(catalogFile || join(root, "catalog.json"), { documents: [], syncHours: [] }),
+          staff: readJson(join(root, "staff.json"), { matchMin: 0.8, aliases: {}, services: {} }),
+          internacion: { ...internacion, beds: applyBedCapacity(internacion.beds ?? []) },
+          "lab-pacientes": clinical ? readJson(join(root, "lab-pacientes.json"), { pacientes: [] }) : { pacientes: [] },
+          legajos: hasRole(user, ["DIRECTION", "ADMIN"]) ? readJson(join(root, "legajos.json"), {}) : {},
+          inbox: clinical ? readJson(join(root, "inbox.json"), {}) : {},
+          "mail-sync": clinical ? readJson(join(root, "mail-sync.json"), {}) : {},
+        };
+        return json(res, 200, result);
+      }
       if (url.pathname === "/api/personal/directory" && req.method === "GET") {
         if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
         return json(res, 200, { people: staffDirectory(dataDir, authConfig.secret) });
@@ -213,7 +247,12 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
       }
       if (url.pathname === "/api/maps/config" && req.method === "GET") {
         if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
-        return json(res, 200, { configured: Boolean(maps.browserKey && maps.serverKey), browserKey: maps.browserKey || null, routesKey: maps.serverKey || null });
+        return json(res, 200, { configured: Boolean(maps.browserKey), browserKey: maps.browserKey || null, routesConfigured: Boolean(maps.serverKey) });
+      }
+      if (url.pathname === "/api/maps/route" && req.method === "POST") {
+        if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        const body = JSON.parse((await readBody(req, 8192)).toString("utf8"));
+        return json(res, 200, await computeRouteWithGoogle(body, maps, fetchImpl));
       }
       if (url.pathname === "/api/maps/geocode" && req.method === "POST") {
         if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
@@ -342,9 +381,31 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
         return send(res, 200, readFileSync(item.path), type, { "content-disposition": `attachment; filename="whatsapp-${encodeURIComponent(id)}.jpg"` });
       }
       if (url.pathname === "/api/whatsapp/config") return json(res, 405, { error: "server_environment_only" });
+      if (url.pathname === "/api/whatsapp/templates" && req.method === "GET") {
+        if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        return json(res, 200, await messaging.templates());
+      }
+      if (url.pathname === "/api/whatsapp/consents") {
+        if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        if (req.method === "GET") return json(res, 200, { items: readConsents(dataDir, authConfig.secret) });
+        if (req.method !== "POST") return json(res, 405, { error: "method_not_allowed" });
+        if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        const body = JSON.parse((await readBody(req, 8192)).toString("utf8"));
+        const consent = saveConsent(dataDir, authConfig.secret, body, user.id);
+        appendAudit(dataDir, { actor: user.id, action: "whatsapp_consent", kind: "human_decision", active: consent.active });
+        return json(res, 200, { consent });
+      }
+      if (["/api/whatsapp/preview", "/api/whatsapp/confirm"].includes(url.pathname) && req.method === "POST") {
+        if (!hasRole(user, ["DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        const body = JSON.parse((await readBody(req, 128_000)).toString("utf8"));
+        const result = url.pathname.endsWith("preview") ? messaging.preview(body, user.id) : await messaging.confirm(body, user.id);
+        appendAudit(dataDir, { actor: user.id, action: url.pathname.endsWith("preview") ? "whatsapp_preview" : "whatsapp_confirm", kind: "human_decision", count: result.recipients?.length ?? result.results?.length ?? 0 });
+        return json(res, 200, result);
+      }
       if (url.pathname === "/api/whatsapp/outbox" && req.method === "GET") {
         if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
-        return json(res, 200, { configured: whatsappReady(waConfig), canSend: whatsappCanSend(waConfig), canApprove: hasRole(user, ["DIRECTION", "ADMIN"]), summary: outboxSummary(dataDir, authConfig.secret), items: readOutbox(dataDir, authConfig.secret).map((record) => ({ ...record, serviceWindow: serviceWindowStatus(dataDir, record.to) })) });
+        const token = whatsappCanSend(waConfig) ? await whatsappTokenStatus(waConfig, { fetchImpl }) : { ok: false, code: "sin_configurar" };
+        return json(res, 200, { configured: whatsappReady(waConfig), canSend: whatsappCanSend(waConfig) && token.ok === true, token, canApprove: hasRole(user, ["DIRECTION", "ADMIN"]), summary: outboxSummary(dataDir, authConfig.secret), items: readOutbox(dataDir, authConfig.secret).map((record) => ({ ...record, serviceWindow: serviceWindowStatus(dataDir, record.to) })) });
       }
       if (url.pathname === "/api/whatsapp/outbox" && req.method === "POST") {
         if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
@@ -438,6 +499,7 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
       }
 
       if (url.pathname === "/api/boards" && req.method === "GET") {
+        if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
         if (user.role === "DRIVER") return json(res, 403, { error: "forbidden" });
         return json(res, 200, readBoards(dataDir));
       }
@@ -485,9 +547,9 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
         // Cronogramas leídos automáticamente del correo (scripts/ingest_pending.py).
         const live = readJson(join(dataDir, "catalog", "live.json"), { generatedAt: null, documents: [] });
         const mail = readJson(join(dataDir, "mail", "status.json"), { status: "unknown", at: null });
-        const claims = readJson(join(dataDir, "mail", "reclamos.json"), {});
+        const claims = readClaimState(dataDir);
         const manualDuties = readJson(join(dataDir, "guardias", "manual.json"), {});
-        return json(res, 200, { manual: manualDuties && typeof manualDuties === "object" ? manualDuties : {}, reclamos: { enabled: claims?.enabled === true, month: claims?.month ?? null, services: claims?.services && typeof claims.services === "object" ? claims.services : {} }, generatedAt: live.generatedAt ?? null, documents: Array.isArray(live.documents) ? live.documents : [], unread: (Array.isArray(live.unread) ? live.unread : []).map((item) => ({ id: String(item?.id ?? ""), filename: String(item?.filename ?? ""), mailDate: String(item?.mailDate ?? ""), departments: Array.isArray(item?.departments) ? item.departments : [] })), mail: { status: mail.status ?? "unknown", at: mail.at ?? null }, running: Boolean(mailRunner?.running) });
+        return json(res, 200, { manual: manualDuties && typeof manualDuties === "object" ? manualDuties : {}, reclamos: { enabled: claims?.enabled === true, month: claims?.month ?? null, startsOn: claims?.startsOn ?? null, services: claims?.services && typeof claims.services === "object" ? claims.services : {} }, generatedAt: live.generatedAt ?? null, documents: Array.isArray(live.documents) ? live.documents : [], unread: (Array.isArray(live.unread) ? live.unread : []).map((item) => ({ id: String(item?.id ?? ""), filename: String(item?.filename ?? ""), mailDate: String(item?.mailDate ?? ""), departments: Array.isArray(item?.departments) ? item.departments : [] })), mail: { status: mail.status ?? "unknown", at: mail.at ?? null }, running: Boolean(mailRunner?.running) });
       }
       if (url.pathname === "/api/clima/nivel" && req.method === "GET") {
         // Sólo el nivel de alerta: lo consulta la barra que se ve en todas las pantallas.
@@ -558,6 +620,18 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
         appendAudit(dataDir, { actor: user.id, role: user.role, action: "download_mail_attachment", kind: "data_access", entity: id });
         return send(res, 200, readFileSync(attachment.path), "application/octet-stream", { "content-disposition": `attachment; filename*=UTF-8''${encodedName}` });
       }
+      if (url.pathname === "/api/reclamos/recipients" && req.method === "POST") {
+        if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
+        const body = JSON.parse((await readBody(req, 4_096)).toString("utf8"));
+        try {
+          const result = setClaimRecipients(dataDir, String(body?.slug ?? ""), body?.to);
+          appendAudit(dataDir, { actor: user.id, role: user.role, action: "reclamo_destinatarios_actualizados", kind: "human_decision", entity: result.slug, source: result.recipientSource });
+          return json(res, 200, result);
+        } catch (error) {
+          if (["unknown_service", "invalid_recipients"].includes(error?.message)) return json(res, 400, { error: error.message });
+          throw error;
+        }
+      }
       if (url.pathname === "/api/reclamos/pause" && req.method === "POST") {
         // Cancela (o reanuda) el reclamo automático de un servicio para el mes en curso.
         if (!hasRole(user, ["COORDINATOR", "DIRECTION", "ADMIN"])) return json(res, 403, { error: "forbidden" });
@@ -570,7 +644,7 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
         const control = readJson(controlPath, {});
         const paused = { ...(control?.paused && typeof control.paused === "object" ? control.paused : {}) };
         if (body?.paused === false) delete paused[slug]; else paused[slug] = claims.month;
-        writeJsonAtomic(controlPath, { paused });
+        writeJsonAtomic(controlPath, { ...control, paused });
         const current = claims.services[slug].status;
         if (current === "pendiente" || current === "cancelado") {
           claims.services[slug] = { ...claims.services[slug], status: paused[slug] ? "cancelado" : "pendiente", due: false };
@@ -688,6 +762,8 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
       for (const code of ["invalid_private_contact", "staff_name_locked", "invalid_staff_group", "invalid_staff_group_members", "invalid_group_message"]) clientErrors.add(code);
       for (const code of ["invalid_schedule", "schedule_not_found"]) clientErrors.add(code);
       for (const code of ["invalid_recipient", "invalid_kind", "invalid_actor", "invalid_motivo", "invalid_body", "invalid_template_name", "invalid_language_code", "invalid_template_params", "invalid_outbound_id", "invalid_outbound_action", "outbound_not_draft", "outbound_not_pending", "outbound_not_approved", "service_window_closed", "duplicate_send", "send_rate_limit"]) clientErrors.add(code);
+      const messagingErrors = ["template_not_verified", "consent_required", "invalid_consent", "invalid_preview", "preview_expired", "confirmation_required", "no_authorized_recipients", "invalid_route_endpoint", "send_in_progress"];
+      for (const code of messagingErrors) clientErrors.add(code);
       const status = error?.message === "body_too_large" ? 413
         : error?.message === "unsupported_image_type" ? 415
           : error?.message === "catalog_conflict" || error?.message === "schedule_limit" ? 409
@@ -701,6 +777,7 @@ export function createHospitalServer({ distDir, dataDir, catalogFile = null, int
               : String(error?.message ?? "").startsWith("ai_") || String(error?.message ?? "").startsWith("openai_") ? 503
                 : 500;
       const specificErrors = new Set(["invalid_private_contact", "staff_name_locked", "invalid_staff_group", "invalid_staff_group_members", "invalid_group_message", "invalid_schedule", "schedule_not_found", "invalid_recipient", "invalid_kind", "invalid_motivo", "invalid_body", "invalid_template_name", "invalid_template_params", "outbound_not_found", "outbound_not_draft", "outbound_not_pending", "outbound_not_approved", "service_window_closed", "duplicate_send", "send_rate_limit", "whatsapp_not_configured"]);
+      for (const code of messagingErrors) specificErrors.add(code);
       const safeWhatsAppError = /^whatsapp_send_\d{3,6}$/.test(String(error?.message ?? "")) ? error.message : null;
       return json(res, status, { error: safeWhatsAppError ?? (status >= 500 ? "service_unavailable" : specificErrors.has(error?.message) ? error.message : "invalid_request") });
     }

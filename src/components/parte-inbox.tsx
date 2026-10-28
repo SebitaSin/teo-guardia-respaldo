@@ -4,7 +4,7 @@ import { cn } from "@/lib/utils";
 
 export function ParteInbox() {
   const [busy, setBusy] = useState(false);
-  const [note, setNote] = useState("Las imágenes quedan privadas y A CONFIRMAR.");
+  const [note, setNote] = useState("Las imágenes quedan guardadas en privado.");
 
   async function onFiles(files: FileList | null) {
     if (!files?.length) return;

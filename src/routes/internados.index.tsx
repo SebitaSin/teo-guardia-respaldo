@@ -13,7 +13,7 @@ import {
   resumenHospital,
   PARTE_FECHA,
 } from "@/data/internacion";
-import { clinicalRank, dutiesOn, dutyLines, todayISO } from "@/data/catalog";
+import { clinicalRank, dutiesOn, dutyLines, guardiaDayISO, todayISO } from "@/data/catalog";
 import { cn } from "@/lib/utils";
 import { useParteTick } from "@/lib/use-parte";
 
@@ -42,7 +42,7 @@ function DashboardPage() {
   const patho = patologias();
   const today = todayISO();
   const hour = hourNow();
-  const dutyHits = dutiesOn(today).filter((duty) => duty.text.trim()).sort((a, b) => clinicalRank(a.dept.slug) - clinicalRank(b.dept.slug));
+  const dutyHits = dutiesOn(guardiaDayISO()).filter((duty) => duty.text.trim()).sort((a, b) => clinicalRank(a.dept.slug) - clinicalRank(b.dept.slug));
   const dutyRows = dutyHits.flatMap((duty) => dutyLines(duty.text).map((line) => ({ ...line, dept: duty.dept, doc: duty.doc })));
   const guardiasAhora = dutyRows.filter((row) => activeHours(row.hours, hour));
   const sinHorario = dutyRows.filter((row) => !row.hours).length;
@@ -66,7 +66,7 @@ function DashboardPage() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm text-muted">Parte diario {formatParteFecha()} · Guardias de {today}</p>
+      <p className="text-sm text-muted">Parte diario {formatParteFecha()} · Guardias de {guardiaDayISO()} (8 a 8 h)</p>
 
       <ParteInbox />
 

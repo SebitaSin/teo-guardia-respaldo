@@ -22,6 +22,7 @@ import { storageGet, storageSet } from "@/lib/safe-storage";
 import { Car } from "lucide-react";
 import { TrasladoSolidario } from "@/components/traslado-solidario";
 import { AutogestionPanel } from "@/components/autogestion-panel";
+import { useMapLayers, MapLayerButtons, MapLayerLegend } from "@/components/map-layers";
 
 declare global {
   interface Window { google?: any }
@@ -114,7 +115,7 @@ export function PersonalMapPage() {
   const [locations, setLocations] = useState<PrivateStaffLocation[]>([]);
   const [contacts, setContacts] = useState<PrivateStaffContact[]>([]);
   const [browserKey, setBrowserKey] = useState<string | null>(null);
-  const [routesKey, setRoutesKey] = useState<string | null>(null);
+  const [routesConfigured, setRoutesConfigured] = useState(false);
   const [configured, setConfigured] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [updating, setUpdating] = useState(false);
@@ -145,9 +146,13 @@ export function PersonalMapPage() {
   const infoRef = useRef<any>(null);
   const markersRef = useRef<any[]>([]);
   const routeLineRef = useRef<any>(null);
+  const layers = useMapLayers(mapReady ? mapRef.current : null, mapReady);
 
   // Una fila por persona real: las fichas repetidas se juntan y las áreas quedan unificadas.
-  const people = useMemo(() => unifyPeople(directory).map((item) => ({ ...item, key: searchKey(`${item.name} ${item.areas.join(" ")}`) })), [directory]);
+  const people = useMemo(() => unifyPeople(directory).map((item) => {
+    const phone = item.person.phone ?? "";
+    return { ...item, key: searchKey(`${item.name} ${item.areas.join(" ")}`), phoneKey: phone.replace(/\D/g, "") };
+  }), [directory]);
   const areaGroups = useMemo(() => groupByArea(people), [people]);
   const pointById = useMemo(() => new Map(locations.map((point) => [point.staffId, point])), [locations]);
   const pointOf = (item: UnifiedPerson) => item.ids.map((id) => pointById.get(id)).find(Boolean) ?? null;
@@ -155,7 +160,10 @@ export function PersonalMapPage() {
   const activeLetter = letter || LETTERS.find((item) => usedLetters.has(item)) || "A";
   const shown = useMemo(() => {
     const value = searchKey(query.trim());
-    if (value.length >= 2) return people.filter((item) => item.key.includes(value)).slice(0, 60);
+    if (value.length >= 2) {
+      const digits = value.replace(/\D/g, "");
+      return people.filter((item) => item.key.includes(value) || (digits.length >= 2 && item.phoneKey.includes(digits))).slice(0, 60);
+    }
     return people.filter((item) => letterOf(item.name) === activeLetter);
   }, [people, query, activeLetter]);
 
@@ -165,7 +173,7 @@ export function PersonalMapPage() {
     if (!mounted.current) return { rows, points };
     setConfigured(config.configured);
     setBrowserKey(config.browserKey);
-    setRoutesKey(config.routesKey);
+    setRoutesConfigured(config.routesConfigured);
     setLocations(points);
     setContacts(privateContacts);
     setDirectory(rows);
@@ -268,10 +276,7 @@ export function PersonalMapPage() {
     for (const marker of markersRef.current) marker.setMap(null);
     infoRef.current?.close();
     const byId = new Map(people.flatMap((item) => item.ids.map((id) => [id, item] as const)));
-    const bounds = new google.maps.LatLngBounds();
-    bounds.extend(HOSPITAL);
     markersRef.current = locations.map((location) => {
-      bounds.extend({ lat: location.lat, lng: location.lng });
       // Sin "title": el navegador lo mostraría como etiqueta al pasar el cursor.
       const marker = new google.maps.Marker({
         map,
@@ -292,8 +297,14 @@ export function PersonalMapPage() {
       });
       return marker;
     });
-    if (locations.length && !fitted.current) { map.fitBounds(bounds, 50); fitted.current = true; }
+    // El encuadre inicial (ciudad de San Rafael) lo hace useMapLayers; los puntos no lo mueven.
   }, [mapReady, locations, people, contacts]);
+
+  // Capa Personal: se puede apagar para ver sólo antenas, cobertura, relieve o pendientes.
+  useEffect(() => {
+    for (const marker of markersRef.current) marker.setMap(layers.on.personal ? mapRef.current : null);
+    if (!layers.on.personal) infoRef.current?.close();
+  }, [mapReady, locations, people, contacts, layers.on.personal]);
 
   useEffect(() => {
     const google = window.google;
@@ -304,9 +315,10 @@ export function PersonalMapPage() {
     setRouteResult(null);
     if (!routeTarget && !requestedOrigin) { setRouteStatus(""); return; }
     let cancelled = false;
+    if (!routesConfigured) { setRouteStatus("Falta configurar la clave de servidor para Routes y Geocoding."); return; }
     setRouteStatus("Calculando ruta…");
     const origin = requestedOrigin ? { address: requestedOrigin } : { lat: routeTarget!.lat, lng: routeTarget!.lng };
-    void computeRoute(origin, HOSPITAL, routesKey ?? "").then((route) => {
+    void computeRoute(origin, HOSPITAL).then((route) => {
       if (cancelled) return;
       const path = decodePolyline(route.encodedPolyline);
       routeLineRef.current = new google.maps.Polyline({ map, path, geodesic: true, strokeColor: "#2563eb", strokeOpacity: 0.9, strokeWeight: 5 });
@@ -317,7 +329,7 @@ export function PersonalMapPage() {
       setRouteStatus("");
     }).catch(() => { if (!cancelled) setRouteStatus("No se pudo calcular la ruta."); });
     return () => { cancelled = true; };
-  }, [mapReady, routeTarget, requestedOrigin, routesKey]);
+  }, [mapReady, routeTarget, requestedOrigin, routesConfigured]);
 
   function toggleHover(next: boolean) {
     hoverRef.current = next;
@@ -368,13 +380,14 @@ export function PersonalMapPage() {
 
   const renderRow = (item: UnifiedPerson, showAreas: boolean) => {
     const { person, name } = item;
+    const phone = person.phone?.trim();
     const point = pointOf(item);
     const open = Boolean(staffId) && item.ids.includes(staffId);
     return (
       <li key={person.staffId} className="border-b border-border last:border-0">
         <button type="button" aria-expanded={open} onClick={() => selectPerson(point?.staffId ?? person.staffId, point, person)} className={`flex min-h-11 w-full items-center gap-2 px-2 text-left text-sm ${open ? "bg-subtle font-medium" : ""}`}>
           <span aria-hidden="true" style={{ color: point ? colorFor(point.transportMode) : "transparent" }}>●</span>
-          <span className="flex-1">{name}</span>
+          <span className="flex-1">{name}<span className="block text-xs font-normal text-muted">{phone ? `Celular registrado: ${phone}` : "Sin celular registrado"}</span></span>
           {point?.solidario?.dispuesto ? <Car className="size-4 shrink-0 text-primary" aria-label="Dispuesto a llevar compañeros en catástrofe" /> : null}
           {showAreas ? <span className="text-right text-xs text-muted">{item.areas.join(" · ")}</span> : null}
         </button>
@@ -419,7 +432,10 @@ export function PersonalMapPage() {
 
       {loaded && !configured ? <p className="rounded-xl border border-warn/50 bg-warn/10 p-3 text-sm">Google Maps no está configurado.</p> : null}
 
+      <MapLayerButtons {...layers} personalCount={locations.length} />
       <div ref={mapNode} className="h-[55vh] min-h-96 w-full rounded-2xl bg-subtle shadow-[var(--shadow-border)]" aria-label="Mapa de domicilios del personal" />
+      <MapLayerLegend {...layers} />
+      <p className="text-xs text-muted">El punto del mapa es el domicilio registrado; no indica la ubicación actual del celular ni se obtiene con su número.</p>
 
       <section className="rounded-2xl bg-surface p-3 shadow-[var(--shadow-border)]">
         <div className="flex gap-1 overflow-x-auto pb-1" role="tablist" aria-label="Personal por letra">
@@ -427,7 +443,7 @@ export function PersonalMapPage() {
             <button key={item} type="button" role="tab" aria-selected={!query && item === activeLetter} disabled={!usedLetters.has(item)} onClick={() => { setQuery(""); setLetter(item); }} className={`h-11 min-w-11 shrink-0 rounded-lg text-sm font-semibold disabled:opacity-25 ${!query && item === activeLetter ? "bg-primary text-primary-fg" : "border border-border"}`}>{item}</button>
           ))}
         </div>
-        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Buscar persona" placeholder="Buscar por nombre o servicio" className="mt-2 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm" />
+        <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} aria-label="Buscar personal por nombre, área o celular" placeholder="Buscar por nombre, área o celular" className="mt-2 h-11 w-full rounded-lg border border-border bg-surface px-3 text-sm" />
         <ul className="mt-2 max-h-96 overflow-auto">
           {shown.map((item) => renderRow(item, true))}
         </ul>

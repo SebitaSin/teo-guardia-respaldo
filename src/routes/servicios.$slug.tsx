@@ -10,6 +10,7 @@ import {
   dutiesOn,
   latestDoc,
   dutyLines,
+  guardiaDayISO,
   todayISO,
 } from "@/data/catalog";
 import { DEPARTMENT_BY_SLUG } from "@/data/departments";
@@ -51,7 +52,7 @@ function ServicioPage() {
     : latestDoc(slug, monthNow, yearNow) ??
       latestDoc(slug, monthNow === 12 ? 1 : monthNow + 1, monthNow === 12 ? yearNow + 1 : yearNow) ??
       latestDoc(slug);
-  const todayDuty = dutiesOn(today).find((h) => h.dept.slug === slug);
+  const todayDuty = dutiesOn(guardiaDayISO()).find((h) => h.dept.slug === slug);
   const featuredIsCurrent = featured?.month === monthNow && featured?.year === yearNow;
   const Icon = dept.icon;
   const months = [...new Map(

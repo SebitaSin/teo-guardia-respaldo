@@ -111,6 +111,12 @@ export function todayISO(date = new Date()): string {
   }).format(date);
 }
 
+// Día de guardia: se toma de 8 a 8 h. Antes de las 8 sigue la guardia del día anterior.
+export const GUARDIA_START_HOUR = 8;
+export function guardiaDayISO(date = new Date()): string {
+  return todayISO(new Date(date.getTime() - GUARDIA_START_HOUR * 3_600_000));
+}
+
 export function formatLongDate(iso: string): string {
   const [y, m, d] = iso.split("-").map(Number);
   const dt = new Date(Date.UTC(y, m - 1, d, 12));

@@ -34,7 +34,7 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
   const alive = await fetch(`http://127.0.0.1:${appPort}/${whole ? "api/health" : "mis-datos"}`).then((r) => r.status === 200).catch(() => false);
   if (!alive) { console.log("\n  La app no está respondiendo. Hacé doble clic en \"Reiniciar servidor\", esperá un minuto y volvé a abrir esto.\n"); process.exit(1); }
   if (!whole) createFormProxy({ appPort }).listen(proxyPort, "127.0.0.1");
-  const tunnel = spawn(exe, ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${whole ? appPort : proxyPort}`], { stdio: ["ignore", "pipe", "pipe"] });
+  const tunnel = spawn(exe, ["tunnel", "--no-autoupdate", "--url", `http://127.0.0.1:${whole ? appPort : proxyPort}`], { stdio: ["ignore", "pipe", "pipe"], windowsHide: true });
   let shown = false;
   const watch = (chunk) => {
     const found = /https:\/\/[a-z0-9-]+\.trycloudflare\.com/.exec(String(chunk));
@@ -43,7 +43,10 @@ if (process.argv[1] === fileURLToPath(import.meta.url)) {
     const link = whole ? found[0] : `${found[0]}/mis-datos`;
     mkdirSync(join(root, "var"), { recursive: true });
     writeFileSync(join(root, "var", whole ? "enlace-app.txt" : "enlace-personal.txt"), `${link}\r\n`, "utf8");
-    console.log(`\n  ${whole ? "ENLACE DE LA APP COMPLETA (pide usuario y contraseña)" : "ENLACE PARA EL PERSONAL"}:\n\n      ${link}\n\n  Quedó copiado en var\\${whole ? "enlace-app.txt" : "enlace-personal.txt"}.\n  Funciona mientras esta ventana siga abierta y la PC prendida.\n  Si cerrás esta ventana, el enlace deja de andar y al abrirla de nuevo sale OTRO distinto.\n`);
+    // Se copia solo al portapapeles: con Ctrl+C en esta ventana el enlace se corta.
+    let copied = false;
+    if (process.platform === "win32") { try { const clip = spawn("clip", [], { stdio: ["pipe", "ignore", "ignore"] }); clip.on("error", () => {}); clip.stdin.end(link); copied = true; } catch { /* sin portapapeles */ } }
+    console.log(`\n  ${whole ? "ENLACE DE LA APP COMPLETA (pide usuario y contraseña)" : "ENLACE PARA EL PERSONAL"}:\n\n      ${link}\n\n  ${copied ? "Ya está copiado: pegalo en WhatsApp con Ctrl+V.\n  NO uses Ctrl+C en esta ventana: corta el enlace.\n  " : ""}También quedó en var\\${whole ? "enlace-app.txt" : "enlace-personal.txt"}.\n  Funciona mientras esta ventana siga abierta y la PC prendida.\n  Si cerrás esta ventana, el enlace deja de andar y al abrirla de nuevo sale OTRO distinto.\n`);
   };
   tunnel.stdout.on("data", watch); tunnel.stderr.on("data", watch);
   tunnel.on("error", () => { console.log("\n  No se pudo iniciar cloudflared.\n"); process.exit(1); });

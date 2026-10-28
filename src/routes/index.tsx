@@ -2,8 +2,9 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check, ChevronDown, Mail, Pencil, RefreshCw, RotateCcw, Smartphone, X } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Input } from "@/components/ui/input";
-import { MONTHS_ES, catalog, docsForDept, dutiesOn, dutyLines, formatLongDate, formatUpdated, missingDutiesOn, todayISO } from "@/data/catalog";
-import { liveClaims, liveUpdatedAt, pauseClaim, saveManualDuty, updateFromMail, type ManualDuty } from "@/lib/live-catalog";
+import { MONTHS_ES, catalog, docsForDept, dutiesOn, dutyLines, formatLongDate, formatUpdated, missingDutiesOn, guardiaDayISO } from "@/data/catalog";
+import { liveClaims, liveUpdatedAt, saveManualDuty, updateFromMail, type ManualDuty } from "@/lib/live-catalog";
+import { ClaimControls } from "@/components/claim-controls";
 import { cn } from "@/lib/utils";
 import { useCatalogTick } from "@/lib/use-catalog";
 import { DEPARTMENT_BY_SLUG } from "@/data/departments";
@@ -120,7 +121,7 @@ function Home() {
   const [minute, setMinute] = useState(0);
   useEffect(() => { const id = setInterval(() => setMinute((n) => n + 1), 60_000); return () => clearInterval(id); }, []);
   const [updating, setUpdating] = useState(false);
-  const today = todayISO();
+  const today = guardiaDayISO();
   const [query, setQuery] = useState("");
   const [focus, setFocus] = useState<SectionId | "todos">("todos");
   const [open, setOpen] = useState<Record<string, boolean>>({});
@@ -176,7 +177,7 @@ function Home() {
     <div className="space-y-3">
       <section className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
         <div className="min-w-0">
-          <p className="text-base font-semibold first-letter:uppercase">{formatLongDate(today)}</p>
+          <p className="text-base font-semibold first-letter:uppercase">{formatLongDate(today)} <span className="text-xs font-normal text-muted">· guardia de 8 a 8 h</span></p>
           <p className={cn("flex items-center gap-1.5 text-xs", stale ? "font-semibold text-warn" : "text-muted")} role={stale ? "status" : undefined}>
             <span className={cn("size-1.5 rounded-full", stale ? "bg-warn" : "bg-ok")} />{stale ? "Correo sin revisar desde " : "Correo revisado "}{updatedLabel()}
           </p>
@@ -210,7 +211,7 @@ function Home() {
           <h2 className="mb-2 flex items-center gap-2 px-1 text-xs font-semibold uppercase tracking-wide text-muted">{block.label}<span className="h-px flex-1 bg-border" />{block.done < block.groups.length ? <span className="normal-case tracking-normal text-warn">{block.groups.length - block.done} sin planilla</span> : null}</h2>
           <div className="columns-1 gap-3 sm:columns-2 lg:columns-3 2xl:columns-4">
             {block.groups.map((group) => {
-              const claim = group.blanks ? claims?.services[group.slug] : undefined;
+              const claim = claims?.services[group.slug];
               const to = claim?.to?.length ? claim.to : lastSenders(group.slug);
               const edit = editing?.slug === group.slug ? editing : null;
               const expanded = Boolean(open[group.slug]) || Boolean(needle);
@@ -248,19 +249,7 @@ function Home() {
                       </div>
                     </div>
                   ) : (
-                    <ul className={cn("px-3 pt-1.5", group.entries.length || (claim && (claim.status === "cancelado" || claims?.enabled)) ? "pb-2.5" : "pb-1.5")}>
-                      {claim && (claim.status === "pendiente" || claim.status === "cancelado") ? (() => {
-                        const cancelled = claim.status === "cancelado";
-                        if (!cancelled && !claims?.enabled) return null; // apagado: no suma nada mostrarlo en cada tarjeta
-                        const text = cancelled ? "Reclamo automático cancelado este mes"
-                          : claim.lastSent ? `Reclamo automático: ${claim.sent} enviados, último ${shortStamp(claim.lastSent)}` : "Reclamo automático: todavía sin enviar";
-                        return (
-                          <li className="flex items-center justify-between gap-2 py-0.5 text-xs text-muted">
-                            <span>{text}</span>
-                            {claims?.enabled || cancelled ? <button type="button" onClick={() => void pauseClaim(group.slug, !cancelled)} className="shrink-0 font-medium text-primary underline">{cancelled ? "Reanudar" : "Cancelar"}</button> : null}
-                          </li>
-                        );
-                      })() : null}
+                    <ul className={cn("px-3 pt-1.5", group.entries.length ? "pb-2.5" : "pb-1.5")}>
                       {rows.map((entry) => {
                         const now = isNow(entry.kind);
                         const later = entry.kind !== "UNKNOWN" && !now;
@@ -276,6 +265,7 @@ function Home() {
                       ) : null}
                     </ul>
                   )}
+                  {claim && claims ? <ClaimControls slug={group.slug} name={group.name} claim={claim} month={claims.month} startsOn={claims.startsOn} enabled={claims.enabled} /> : null}
                 </article>
               );
             })}

@@ -1,0 +1,37 @@
+{
+  "meta": {
+    "title": "Antenas y Comunicaciones San Rafael, Mendoza",
+    "version": "2026-10-14",
+    "purpose": "Preparación ante catástrofes (cortes de luz, sismos). Datos públicos / OSINT.",
+    "notes": "Mayoría de torres celulares del Boletín Municipal 2022. Radios de emergencia actualizadas 2024-2025. Backup celular típico = horas (UPS). Radios VHF solares = más resilientes."
+  },
+  "towers": [
+    {"id": "claro_balloffet", "lat": -34.614433, "lng": -68.341097, "name": "Claro Balloffet 150", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 3, "tech": "Celular 4G/5G parcial", "backup": "UPS típico 2-8h", "notes": "ME274 - Boletín 2022", "category": "celular"},
+    {"id": "claro_olascoaga", "lat": -34.615400, "lng": -68.327745, "name": "Claro Olascoaga 135", "operator": "Claro", "type": "Pedestal", "height_m": 3, "tech": "Celular", "backup": "UPS", "notes": "ME387", "category": "celular"},
+    {"id": "claro_sanmartin", "lat": -34.611599, "lng": -68.327928, "name": "Claro Av. San Martín 435", "operator": "Claro", "type": "Pedestal Camuflado", "height_m": 6, "tech": "Celular", "backup": "UPS", "notes": "ME080", "category": "celular"},
+    {"id": "claro_reyunos", "lat": -34.576286, "lng": -68.711743, "name": "Claro Los Reyunos", "operator": "Claro", "type": "Pedestal Anclado", "height_m": 9, "tech": "Celular zona turística", "backup": "UPS + posible gen", "notes": "ME255", "category": "celular"},
+    {"id": "claro_balloffet2", "lat": -34.633033, "lng": -68.364794, "name": "Claro Balloffet Derqui/Juárez", "operator": "Claro", "type": "Pedestal Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME094", "category": "celular"},
+    {"id": "claro_rawson", "lat": -34.595831, "lng": -68.343313, "name": "Claro Rawson esq Mendoza", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME156", "category": "celular"},
+    {"id": "claro_sarmiento", "lat": -34.608286, "lng": -68.268721, "name": "Claro Sarmiento Cuadro Nacional", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME177", "category": "celular"},
+    {"id": "claro_italia", "lat": -34.607254, "lng": -68.313444, "name": "Claro Italia 1300", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME194", "category": "celular"},
+    {"id": "claro_lisandro", "lat": -34.625396, "lng": -68.359236, "name": "Claro Lisandro de la Torre 1555", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME196", "category": "celular"},
+    {"id": "claro_vargas", "lat": -34.638836, "lng": -68.345341, "name": "Claro Pedro Vargas esq Florida", "operator": "Claro", "type": "Tanque Camuflado", "height_m": 21, "tech": "Celular", "backup": "UPS", "notes": "ME397", "category": "celular"},
+    {"id": "claro_virgenes", "lat": -34.578671, "lng": -68.408965, "name": "Claro Las Vírgenes 7500", "operator": "Claro", "type": "Monoposte", "height_m": 30, "tech": "Celular", "backup": "UPS + gen posible", "notes": "ME472", "category": "celular"},
+    {"id": "claro_callao", "lat": -34.621723, "lng": -68.301888, "name": "Claro Callao 370", "operator": "Claro", "type": "Monoposte", "height_m": 45, "tech": "Celular", "backup": "UPS", "notes": "ME097", "category": "celular"},
+    {"id": "claro_garcia", "lat": -34.575624, "lng": -68.545771, "name": "Claro Gob. García 25 de Mayo", "operator": "Claro", "type": "Monoposte", "height_m": 45, "tech": "Celular", "backup": "UPS", "notes": "ME254", "category": "celular"},
+    {"id": "claro_geranios", "lat": -34.617145, "lng": -68.376752, "name": "Claro Los Geranios 550", "operator": "Claro", "type": "Mástil Arriostrado", "height_m": 54, "tech": "Celular", "backup": "UPS + gen", "notes": "ME238", "category": "celular"},
+    {"id": "claro_heras", "lat": -34.620639, "lng": -68.328636, "name": "Claro Las Heras 278", "operator": "Claro", "type": "Mástil Arriostrado", "height_m": 60, "tech": "Celular", "backup": "UPS", "notes": "ME038", "category": "celular"},
+
+    {"id": "telecom_aero", "lat": -34.5966667, "lng": -68.3923611, "name": "Telecom Aeropuerto (Bentos 124)", "operator": "Telecom/Personal", "type": "Torre", "height_m": 22, "tech": "Celular", "backup": "UPS", "notes": "PM0001 - Boletín 2022", "category": "celular"},
+    {"id": "telecom_juanxxiii", "lat": -34.6463889, "lng": -68.3600000, "name": "Telecom Juan XXIII 1200", "operator": "Telecom/Personal", "type": "Torre alta", "height_m": 84, "tech": "Celular", "backup": "UPS", "notes": "TM0006", "category": "celular"},
+
+    {"id": "vhf_diamante", "lat": -34.85, "lng": -68.95, "name": "Repetidora VHF Cerro Diamante", "operator": "Radio Club LU9MAB + Defensa Civil", "type": "Repetidora altura", "height_m": null, "tech": "VHF 147.210 MHz +600", "backup": "Solar + baterías (días)", "notes": "Reactivada dic 2025. Alta resiliencia. ~2350 msnm", "category": "radio_emergencia"},
+    {"id": "vhf_nevado", "lat": -35.58085, "lng": -68.49, "name": "Repetidora VHF Cerro Nevado", "operator": "Defensa Civil San Rafael", "type": "Repetidora altura", "height_m": null, "tech": "VHF", "backup": "Solar + baterías gel/litio", "notes": "Reparada 2025. Cubre secano y Alvear. ~3500 msnm", "category": "radio_emergencia"},
+
+    {"id": "tda", "lat": -34.629162, "lng": -68.266677, "name": "Antena TDA San Rafael", "operator": "ARSAT", "type": "TV Digital", "height_m": null, "tech": "Televisión Digital Abierta", "backup": "Desconocido", "notes": "Operativa", "category": "otros"},
+
+    {"id": "a1_lafe", "lat": -34.5858551, "lng": -68.4544487, "name": "A1 Torres La Fe / Lombardini", "operator": "A1 Torres", "type": "Autosoportada", "height_m": 36, "tech": "Infraestructura", "backup": "Desconocido", "notes": "2022", "category": "infra"},
+    {"id": "a1_sanlorenzo", "lat": -34.63417, "lng": -68.33734, "name": "A1 Torres San Lorenzo 1653", "operator": "A1 Torres", "type": "Monopolo", "height_m": 30, "tech": "Infraestructura", "backup": "Desconocido", "notes": "2022", "category": "infra"},
+    {"id": "a1_mitre", "lat": -34.627772, "lng": -68.289407, "name": "A1 Torres Mitre 2989", "operator": "A1 Torres", "type": "Monopolo", "height_m": 36, "tech": "Infraestructura", "backup": "Desconocido", "notes": "2022", "category": "infra"}
+  ]
+}

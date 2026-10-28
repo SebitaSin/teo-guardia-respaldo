@@ -1,7 +1,7 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { syncIdentityMarks } from "@/lib/identidad";
 import { syncCambios } from "@/lib/cambio-guardia";
-import { startLive } from "@/lib/live-catalog";
+import { catalogConnectivity, startLive } from "@/lib/live-catalog";
 
 function isChunkFail(msg: string) {
   return /Loading chunk|Failed to fetch dynamically imported module|ChunkLoadError|Importing a module script failed/i.test(
@@ -11,6 +11,12 @@ function isChunkFail(msg: string) {
 
 /** Sin cartel. Solo repara: www → dominio bueno, y recarga si un JS no carga. */
 export function BootGuard() {
+  const [degraded, setDegraded] = useState(false);
+  useEffect(() => {
+    const update = () => setDegraded(catalogConnectivity() === 'degraded');
+    window.addEventListener('schestakow-connectivity', update); update();
+    return () => window.removeEventListener('schestakow-connectivity', update);
+  }, []);
   useEffect(() => {
     void syncIdentityMarks();
     void syncCambios();
@@ -57,5 +63,5 @@ export function BootGuard() {
     };
   }, []);
 
-  return null;
+  return degraded ? <div role="status" className="fixed inset-x-0 top-0 z-[100] bg-warn-soft p-3 text-center text-sm text-warn">Sin actualización del servidor: se conserva la última información disponible. Verificá su fecha antes de usarla.</div> : null;
 }

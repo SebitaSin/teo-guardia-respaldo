@@ -1,0 +1,85 @@
+HOSPITAL SCHESTAKOW - INSTALACION, MUDANZA Y CONTROL DESDE CASA
+
+1. Copia esta carpeta COMPLETA a un pendrive o a la otra computadora.
+   Si recibiste el ZIP: clic derecho > Extraer todo. No lo ejecutes dentro del ZIP.
+2. En la OTRA PC: abre EMPEZAR.cmd. Para preparar todo elige la opcion 2.
+   Windows solicitara permiso de administrador una sola vez si hace falta.
+   Acepta el aviso de Windows. Si se cancela o la cuenta no es administradora,
+   el asistente se detiene sin abrir ventanas repetidas ni instalar a medias.
+   El asistente no borra documentos.
+   Necesita Windows 10/11 x64, CPU Intel/AMD, 4 GB RAM y 30 GB libres.
+   Vista, 7, 8, 8.1, ARM y Windows de 32 bits: se detiene y explica el problema.
+   No cambia Windows, no formatea ni compra licencias automaticamente.
+   Windows 10 requiere soporte de seguridad vigente; preferir Windows 11.
+3. CUANDO LA NUEVA PC ESTE PREPARADA: en la PC ANTERIOR abre
+   PREPARAR-MUDANZA-EN-PC-ANTERIOR.cmd desde esta misma carpeta.
+   Carpeta actual: la que contiene server, var y src (schestakow-libre).
+   Elige donde guardar Mudanza.guardia.
+   Elige una frase larga y guardala. Nadie necesita que la envies por chat.
+   Al escribir MUDAR AHORA se detiene la app anterior y el enlace del personal.
+   Despues de ese momento no recibira nuevas fichas hasta activar el destino.
+   Las claves, datos, respuestas, planillas y pendientes van cifrados juntos.
+   Incluye las API keys actuales de Google y OpenAI, clave del correo,
+   credenciales de laboratorio y campos configurados de WhatsApp. El exportador
+   muestra INCLUIDA o NO CONFIGURADA por servicio, sin mostrar ninguna clave.
+   REVISAR-CLAVES-EN-PC-ANTERIOR.cmd permite revisar sin detener ni exportar.
+4. Lleva el archivo .guardia a la otra PC. EMPEZAR > 3 Importar.
+   Indica el archivo y escribe la frase. Luego 4 Activar.
+   No prendas la app anterior: solo una copia debe enviar reclamos y recibir datos.
+   Se conservan el usuario y la contrasena de la app. No se crean datos de ejemplo.
+   Al importar se comprueba que cada clave guardada coincide con la original.
+   Si se importa una COPIA DE PREPARACION, queda preparada sin activar otro
+   servidor ni enviar reclamos. Antes del cambio definitivo se importa la
+   copia FINAL actualizada; la preparacion anterior se conserva como respaldo.
+   En el escritorio aparece HOSPITAL SCHESTAKOW con el icono del hospital:
+   doble clic para abrir la app. Administrar y Revisar llevan el mismo icono.
+5. Elige 5: instala el control remoto de Google. En la pagina inicia sesion
+   con TU cuenta, registra la computadora como HOSPITAL y elige un PIN.
+   Desde casa: https://remotedesktop.google.com/access/ , misma cuenta y PIN.
+   Este inicio de sesion y la asociacion personal no se pueden hacer por vos.
+6. Para un enlace fijo: registrar un dominio, agregarlo a TU cuenta Cloudflare
+   y configurar los servidores DNS indicados por Cloudflare en el registrador.
+   Despues elige 6. El asistente abre el inicio de sesion, crea el tunel y
+   enlaza el nombre sin abrir puertos del router. No compra nada por su cuenta.
+   No usar el enlace temporal anterior como enlace permanente.
+   El dominio elegido y la publicacion deben autorizarse desde tu cuenta.
+7. Reinicia Windows. La app debe responder sin abrir ventanas ni iniciar sesion.
+   Desde tu celular con Wi-Fi APAGADO abre el dominio, inicia sesion y revisa
+   guardias, camas, nomina, mapa y clima. Abre /mis-datos y completa TU ficha.
+   Desde la PC comproba que aparece y sigue guardada despues de reiniciar.
+   No dar por terminada la mudanza hasta hacer esta comprobacion real.
+8. Elige 1 para generar un informe de faltantes, sin claves ni nombres.
+   Correo: actualizar y comprobar hora/adjuntos. Los reclamos ya autorizados
+   conservan su estado. No probar envio de WhatsApp sin decidirlo antes.
+   Maps: autorizar el nuevo dominio en la cuenta de Google si lo exige.
+   Laboratorio: comprobar acceso desde la nueva red. Migrar no renueva tokens.
+   IA: conserva controles y presupuestos existentes; no amplifica autorizaciones.
+9. Elige 7 para respaldo cifrado en disco externo. Se pausa el servicio durante
+   la copia y se reinicia. Una copia en el mismo disco no cubre una rotura.
+   Para restaurar un respaldo tras una averia, usar Importar y confirmar
+   ORIGEN FUERA DE SERVICIO. No se restaura encima de una app activa.
+10. Para corregir desde casa, entra por control remoto. Las actualizaciones
+    preparadas en tu PC se llevan como nueva carpeta instaladora. Opcion 8:
+    conserva datos y claves y deja una copia privada de la version anterior.
+    Despues abrir Revisar y comprobar las pantallas afectadas.
+
+Incluido sin descargar en destino: app compilada, Node 24.22.1, Python 3.14.10,
+PDF, Excel, Pillow, SSL, SQLite, Cloudflare, Visual C++, Chrome y host remoto.
+Los binarios de Microsoft/Google se verifican por firma antes de instalar.
+El manifiesto verifica SHA256 de todos los archivos para detectar copia danada.
+No es una firma de distribucion: conservar el paquete obtenido de esta PC.
+
+Instalacion: C:\ProgramData\GuardiaSchestakow
+Datos: app\var y app\src\data. Claves: secrets.dpapi, protegidas por Windows.
+Toda esta carpeta instalada es privada. No subirla a GitHub ni compartirla.
+La carpeta instaladora generica no contiene los datos operativos del hospital.
+Los registros de error y las copias descifradas de importacion quedan privados.
+No se borran automaticamente copias o versiones existentes.
+
+El equipo debe seguir encendido y con internet. El servicio evita la suspension
+mientras corre; no puede evitar un corte de luz, router, Wi-Fi o cierre de tapa
+con politica de apagado. Ethernet y UPS mejoran continuidad si hay presupuesto.
+No se promete corregir automaticamente fallos de hardware ni todos los errores.
+
+Estado: el paquete se prueba en esta PC; la PC destino, su reinicio real,
+registro de control remoto, dominio y servicios externos se validan alli.

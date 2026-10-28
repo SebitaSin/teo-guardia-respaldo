@@ -8,9 +8,9 @@ const ITEMS = [
   { to: "/internados/captura", icon: Camera, name: "Fotos de pizarras", text: "Las fotos que llegan por WhatsApp, cómo se leyeron y en qué servicio se publicaron." },
   { to: "/archivo", icon: FolderSearch, name: "Archivo del correo", text: "Todos los archivos recibidos en la casilla del hospital, por mes, con su destino." },
   { to: "/cambios", icon: Mail, name: "Cambios de guardia", text: "Cargar a mano un cambio entre dos personas y ver los hechos." },
-  { to: "/internados/alertas", icon: Bell, name: "Alertas", text: "Ocupación alta, pacientes en ARM y camas a confirmar." },
+  { to: "/internados/alertas", icon: Bell, name: "Alertas", text: "Ocupación alta y pacientes en ARM." },
   { to: "/internados", icon: LayoutDashboard, name: "Resumen del hospital", text: "Ocupación por servicio y días de internación en una sola vista." },
-  { to: "/comunicaciones", icon: MessageCircle, name: "Mensajes al personal", text: "Todavía no envía: falta registrar el número en Meta." },
+  { to: "/comunicaciones", icon: MessageCircle, name: "Mensajes al personal", text: "Redactar mensajes para contactos o grupos; el envío puede requerir aprobación." },
 ] as const;
 
 function ComplementosPage() {

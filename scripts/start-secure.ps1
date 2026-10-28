@@ -52,8 +52,16 @@ if (Test-Path -LiteralPath $mapsCredentialFile) {
   if (-not ($mapsCredential -is [Management.Automation.PSCredential])) { throw 'La credencial protegida de Google Maps no tiene un formato válido.' }
   $mapsPtr = [Runtime.InteropServices.Marshal]::SecureStringToBSTR($mapsCredential.Password)
   try {
-    $env:GOOGLE_MAPS_API_KEY = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($mapsPtr)
-    $env:GOOGLE_ROUTES_API_KEY = $env:GOOGLE_MAPS_API_KEY
+    $mapsStoredSecret = [Runtime.InteropServices.Marshal]::PtrToStringBSTR($mapsPtr)
+    if ($mapsCredential.UserName -match '^AIza[\w-]{30,}$' -and $mapsCredential.UserName -ne $mapsStoredSecret) {
+      $env:GOOGLE_MAPS_API_KEY = $mapsCredential.UserName
+      $env:GOOGLE_ROUTES_API_KEY = $mapsStoredSecret
+    } else {
+      # Credencial antigua: sólo está verificada para Maps JavaScript.
+      $env:GOOGLE_MAPS_API_KEY = $mapsStoredSecret
+      $env:GOOGLE_ROUTES_API_KEY = ''
+    }
+    $mapsStoredSecret = $null
   } finally {
     if ($mapsPtr -ne [IntPtr]::Zero) { [Runtime.InteropServices.Marshal]::ZeroFreeBSTR($mapsPtr) }
   }

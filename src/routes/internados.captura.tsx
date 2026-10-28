@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { Link } from "@tanstack/react-router";
 import { type ChangeEvent, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
+import { EstrellaVerificada } from "@/components/board-bed-card";
 
 export const Route = createFileRoute("/internados/captura")({ component: CapturaPage });
 
@@ -56,7 +57,7 @@ function CapturaPage() {
       const response = await fetch("/api/capture/upload", { method: "POST", headers: { "content-type": file.type, "x-file-name": encodeURIComponent(file.name) }, body: file, signal: AbortSignal.timeout(30_000) });
       if (!response.ok) throw new Error(`upload_${response.status}`);
       const result = (await response.json()) as { duplicate: boolean };
-      setNotice(result.duplicate ? "La imagen ya estaba guardada; no se duplicó." : "Imagen original guardada. Quedó A CONFIRMAR.");
+      setNotice(result.duplicate ? "La imagen ya estaba guardada; no se duplicó." : "Imagen original guardada.");
       await loadSources();
     } catch { setNotice("No se pudo guardar la imagen. No se publicó ningún dato."); }
     finally { setBusy(null); }
@@ -69,9 +70,8 @@ function CapturaPage() {
       if (!response.ok) throw new Error(`ai_${response.status}`);
       const result = (await response.json()) as AiResult;
       setAiResults((current) => ({ ...current, [captureId]: result }));
-      const summary = result.verificationSummary;
-      setNotice(summary ? `Lectura terminada: ${summary.verified} fila(s) verificadas, ${summary.review} para revisar y ${summary.conflicts} con conflicto.` : "Lectura terminada. Los campos inciertos quedaron para revisión.");
-    } catch { setNotice("La interpretación no se completó. La captura sigue A CONFIRMAR."); }
+      setNotice(`Lectura terminada: ${result.rows.length} fila(s).`);
+    } catch { setNotice("La lectura no se completó. La imagen original sigue guardada."); }
     finally { setBusy(null); }
   }
 
@@ -80,7 +80,7 @@ function CapturaPage() {
     try {
       const response = await fetch("/api/ai/verify", { method: "POST", signal: AbortSignal.timeout(15_000) });
       const result = (await response.json()) as { ok?: boolean; reason?: string; model?: string | null };
-      setAiVerification(result.ok ? `OpenAI verificado · ${result.model ?? "modelo configurado"}` : `OpenAI no disponible · ${result.reason ?? "revisar configuración"}`);
+      setAiVerification(result.ok ? `OpenAI disponible · ${result.model ?? "modelo configurado"}` : `OpenAI no disponible · ${result.reason ?? "revisar configuración"}`);
     } catch {
       setAiVerification("No se pudo verificar OpenAI desde el servidor.");
     }
@@ -90,7 +90,7 @@ function CapturaPage() {
     setAiResults((current) => {
       const result = current[captureId];
       if (!result) return current;
-      const rows = result.rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value } : row);
+      const rows = result.rows.map((row, rowIndex) => rowIndex === index ? { ...row, [field]: value, verification: undefined } : row);
       return { ...current, [captureId]: { ...result, rows } };
     });
   }
@@ -107,10 +107,10 @@ function CapturaPage() {
   }
 
   return <div className="space-y-5">
-    <header><h1 className="text-[1.6rem] font-semibold tracking-tight">Captura de pizarrones</h1><p className="mt-1 text-sm text-muted">Lectura automática con contraste de cama, parte actual y laboratorio. Sólo las excepciones se destacan para revisión.</p></header>
+    <header><h1 className="text-[1.6rem] font-semibold tracking-tight">Captura de pizarrones</h1><p className="mt-1 text-sm text-muted">Fotos recibidas y lectura de las planillas de pacientes.</p></header>
 
     <section className="rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)]">
-      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">{sourceStatus}</p><Button type="button" size="sm" variant="secondary" onClick={() => void verifyAi()}>Verificar ChatGPT/OpenAI</Button></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><p className="text-sm font-medium">{sourceStatus}</p><Button type="button" size="sm" variant="secondary" onClick={() => void verifyAi()}>Comprobar conexión con OpenAI</Button></div>
       {intake ? <p className={`mt-2 text-sm ${intake.lastError ? "text-warn" : "text-muted"}`}>{intake.lastError ? "Carpeta de fotos de WhatsApp: no se pudo leer. No están entrando fotos solas." : `Carpeta de fotos de WhatsApp revisada ${intake.lastScanAt ? new Date(intake.lastScanAt).toLocaleTimeString("es-AR", { hour: "2-digit", minute: "2-digit" }) : "—"} · ${intake.lastNewAt ? `última foto nueva ${new Date(intake.lastNewAt).toLocaleString("es-AR")}` : "sin fotos nuevas desde el último reinicio"}`}</p> : null}
       {intake?.vinculo && intake.vinculo.estado !== "NO_INSTALADO" ? <p className={`mt-2 text-sm ${intake.vinculo.estado === "CONECTADO" ? "text-ok" : "text-warn"}`}>{intake.vinculo.estado === "CONECTADO" ? `WhatsApp del hospital conectado${intake.vinculo.ultimaFoto ? ` · última foto recibida ${new Date(intake.vinculo.ultimaFoto).toLocaleString("es-AR")}` : " · todavía no llegó ninguna foto"}` : intake.vinculo.estado === "SIN_VINCULAR" ? "WhatsApp del hospital sin vincular: no entran fotos solas. En la PC, abrir VINCULAR-WHATSAPP y escanear el código con el celular del 260 405 6998." : "WhatsApp del hospital desconectado; la app está reintentando. Mientras tanto no entran fotos."}</p> : null}
       {aiVerification ? <p role="status" className="mt-2 text-sm text-muted">{aiVerification}</p> : null}
@@ -125,28 +125,23 @@ function CapturaPage() {
         const result = aiResults[capture.captura_id];
         return <li key={capture.captura_id} className="rounded-xl bg-surface px-4 py-3 text-sm shadow-[var(--shadow-border)]">
           <p className="font-medium">{new Date(capture.recibido_en).toLocaleString("es-AR")} · {capture.fuente === "CARGA_MANUAL" ? "Carga manual" : "WhatsApp"}{capture.turno ? capture.turno_origen === "GRUPO" ? <span className="ml-2 text-xs font-normal text-primary">{capture.turno}</span> : <span className="ml-2 rounded bg-warn-soft px-1.5 py-0.5 text-xs font-normal text-warn">turno {capture.turno} estimado</span> : null}</p>
-          <p className="text-muted">{capture.estado} · {[capture.grupo, capture.remitente_nombre].filter(Boolean).join(" · ") || capture.nombre_original || capture.remitente || "origen registrado"}</p>
+          <p className="text-muted">{[capture.grupo, capture.remitente_nombre].filter(Boolean).join(" · ") || capture.nombre_original || capture.remitente || "origen registrado"}</p>
           {capture.texto || capture.servicio ? <p className="mt-1 font-medium">{capture.servicio ?? capture.texto}{capture.servicio && capture.texto && capture.servicio !== capture.texto ? <span className="ml-2 text-xs font-normal text-muted">texto del mensaje: {capture.texto}</span> : null}</p> : null}
-          {capture.publicacion?.estado === "PUBLICADA" && capture.publicacion.slug ? <p className="mt-1 text-sm text-ok">Publicada en <Link to="/internados/$slug" params={{ slug: capture.publicacion.slug }} className="font-medium underline">{capture.publicacion.servicio}</Link>{capture.publicacion.a_revisar ? <span className="ml-2 text-warn">{capture.publicacion.a_revisar} cama(s) a confirmar</span> : null}</p> : null}
+          {capture.publicacion?.estado === "PUBLICADA" && capture.publicacion.slug ? <p className="mt-1 text-sm">Publicada en <Link to="/internados/$slug" params={{ slug: capture.publicacion.slug }} className="font-medium underline">{capture.publicacion.servicio}</Link></p> : null}
           {capture.publicacion?.estado === "NO_PUBLICADA" ? <p className="mt-1 text-sm text-warn">No se publicó: {capture.publicacion.motivo}.</p> : null}
           <img className="mt-3 max-h-80 w-full rounded-lg bg-bg object-contain" src={`/api/capture/image/${encodeURIComponent(capture.captura_id)}`} alt="Imagen original del pizarrón para revisión" />
           {aiConfigured && capture.estado === "A_CONFIRMAR" && !result && capture.publicacion?.estado !== "PUBLICADA" ? <Button className="mt-2" type="button" size="sm" variant="secondary" disabled={busy === capture.captura_id} onClick={() => void interpret(capture.captura_id)}>{busy === capture.captura_id ? "Interpretando…" : "Crear borrador con IA"}</Button> : null}
-          {result ? <div className="mt-3 space-y-3 border-t pt-3"><p className={`font-semibold ${result.status === "VERIFICADA_AUTOMATICAMENTE" ? "text-ok" : "text-warn"}`}>{result.status === "VERIFICADA_AUTOMATICAMENTE" ? "Lectura contrastada" : "Excepciones a revisar"} · {result.rows.length} fila(s)</p>
-            {result.verificationSummary ? <p className="rounded-lg bg-bg px-3 py-2 text-xs text-muted">Verificadas {result.verificationSummary.verified} · revisar {result.verificationSummary.review} · conflictos {result.verificationSummary.conflicts}</p> : null}
+          {result ? <div className="mt-3 space-y-3 border-t pt-3"><p className="font-semibold">{result.rows.length} fila(s)</p>
             {result.rows.map((row, index) => {
               const rowKey = `${capture.captura_id}:${index}`;
               const verified = row.verification?.status === "VERIFICADA";
-              const editing = editingRows.includes(rowKey) || !verified;
-              return <div key={index} className={`rounded-lg border p-3 ${verified ? "border-ok/40 bg-ok-soft" : row.verification?.status === "CONFLICTO" ? "border-danger/40 bg-danger-soft" : "border-warn/40 bg-warn-soft"}`}>
-                <div className="flex flex-wrap items-start justify-between gap-2"><div><p className="font-semibold">{row.service || "Servicio ilegible"} · cama {row.bed || "ilegible"}</p><p className="text-sm">{row.patient || "Paciente ilegible"}{row.dni ? ` · DNI ${row.dni}` : ""}{row.age ? ` · ${row.age} años` : ""}</p></div><span className={`rounded-full px-2 py-1 text-xs font-semibold ${verified ? "bg-ok text-white" : row.verification?.status === "CONFLICTO" ? "bg-danger text-white" : "bg-warn text-white"}`}>{row.verification?.status ?? "A CONFIRMAR"}</span></div>
-                {row.verification?.sources.length ? <p className="mt-2 text-xs text-muted">Contrastado con {row.verification.sources.join(" + ")} · parte {row.verification.scores.part ?? "—"}% · lab {row.verification.scores.lab ?? "—"}%</p> : null}
-                {row.verification?.reasons.length ? <p className="mt-2 text-xs text-danger">{row.verification.reasons.join(" · ")}</p> : null}
-                {row.learnedCorrections?.length ? <p className="mt-2 text-xs text-primary">Corrección frecuente aplicada: {row.learnedCorrections.map((item) => `${item.from} → ${item.to}`).join(", ")}</p> : null}
-                {verified && !editing ? <Button className="mt-3" type="button" size="sm" variant="ghost" onClick={() => setEditingRows((current) => [...current, rowKey])}>Editar igualmente</Button> : null}
+              const editing = editingRows.includes(rowKey);
+              return <div key={index} className="rounded-lg border p-3">
+                <div><p className="font-semibold">{row.service || "Servicio ilegible"} · cama {row.bed || "ilegible"}</p><p className="text-sm">{row.patient || "Paciente ilegible"}{row.patient && verified && !editing ? <EstrellaVerificada /> : null}{row.dni ? ` · DNI ${row.dni}` : ""}{row.age ? ` · ${row.age} años` : ""}</p></div>
+                {!editing ? <Button className="mt-3" type="button" size="sm" variant="ghost" onClick={() => setEditingRows((current) => [...current, rowKey])}>Corregir</Button> : null}
                 {editing ? <div className="mt-3 grid gap-2 sm:grid-cols-2">
                   {(["service", "room", "bed", "patient", "dni", "age", "hc", "insurance", "admission", "diagnosis", "observations"] as const).map((field) => <label key={field} className="text-xs text-muted">{FIELD_LABELS[field]}<input className="mt-1 min-h-10 w-full rounded-md border bg-surface px-2 text-fg" value={row[field] ?? ""} onChange={(event) => editRow(capture.captura_id, index, field, event.target.value || null)} /></label>)}
-                  <label className="text-xs text-muted">Confianza<input className="mt-1 min-h-10 w-full rounded-md border bg-surface px-2 text-fg" type="number" min="0" max="100" value={row.confidence} onChange={(event) => editRow(capture.captura_id, index, "confidence", Number(event.target.value))} /></label>
-                  {(["arm", "post_surgical"] as const).map((field) => <label key={field} className="text-xs text-muted">{field === "arm" ? "ARM" : "Postquirúrgico"}<select className="mt-1 min-h-10 w-full rounded-md border bg-surface px-2 text-fg" value={row[field] === null ? "UNKNOWN" : row[field] ? "YES" : "NO"} onChange={(event) => editRow(capture.captura_id, index, field, event.target.value === "UNKNOWN" ? null : event.target.value === "YES")}><option value="UNKNOWN">A confirmar</option><option value="YES">Sí</option><option value="NO">No</option></select></label>)}
+                  {(["arm", "post_surgical"] as const).map((field) => <label key={field} className="text-xs text-muted">{field === "arm" ? "ARM" : "Postquirúrgico"}<select className="mt-1 min-h-10 w-full rounded-md border bg-surface px-2 text-fg" value={row[field] === null ? "UNKNOWN" : row[field] ? "YES" : "NO"} onChange={(event) => editRow(capture.captura_id, index, field, event.target.value === "UNKNOWN" ? null : event.target.value === "YES")}><option value="UNKNOWN">Sin dato</option><option value="YES">Sí</option><option value="NO">No</option></select></label>)}
                 </div> : null}
               </div>;
             })}

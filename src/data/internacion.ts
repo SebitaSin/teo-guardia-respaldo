@@ -1,6 +1,7 @@
 import raw from "./internacion.json";
 import { applyIdentidad } from "@/lib/identidad";
 import { applyBoards, type BoardBed } from "@/lib/boards";
+import { applyBedCapacity } from "./bed-capacity.mjs";
 
 export type BedEstado =
   | "OCUPADA"
@@ -63,10 +64,10 @@ export const PARTE_FECHA = file.fecha;
 export const PARTE_HORA = file.hora;
 export const PARTE_FUENTE = file.fuente;
 export const PARTE_NOTES = file.notes;
-export const BEDS: InternacionBed[] = file.beds;
+export const BEDS: InternacionBed[] = applyBedCapacity(file.beds);
 
 function liveBeds(): InternacionBed[] {
-  return applyBoards(applyIdentidad(BEDS));
+  return applyBedCapacity(applyBoards(applyIdentidad(BEDS)));
 }
 
 function liveMeta() {
@@ -271,14 +272,6 @@ export function alertasActivas() {
         detail: "Asistencia respiratoria mecánica",
       });
     }
-  }
-  const rev = resumenHospital().revisar;
-  if (rev) {
-    out.push({
-      tone: "ok",
-      title: `${rev} pacientes A CONFIRMAR`,
-      detail: "Nombre del pizarrón visible. Falta cruce de laboratorio o confirmación a mano.",
-    });
   }
   return out;
 }

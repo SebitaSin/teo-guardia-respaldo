@@ -52,7 +52,7 @@ function which(pathname: string) {
 }
 
 function titleFor(key: string) {
-  if (key === "complementos") return { h: "Complementos", s: "Fotos, archivo, cambios, alertas y mensajes" };
+  if (key === "complementos") return { h: "Complementos", s: "Fotos, archivo, alertas, resumen y mensajes" };
   if (key === "dashboard") return { h: "Resumen del hospital", s: "Ocupación y días de internación" };
   if (key === "guardias") return { h: "Guardias de hoy", s: "08–20 · 20–08 · 24 horas" };
   if (key === "servicios") return { h: "Servicios", s: "Cronogramas por servicio" };
@@ -77,7 +77,9 @@ export function HospitalShell({ children }: { children: ReactNode }) {
   const titles = titleFor(key);
   const k = resumenHospital();
   const [parteDay, parteMonth, parteYear] = formatParteFecha().slice(0, 10).split("/").map(Number);
-  const parteFresh = Date.now() - new Date(parteYear, parteMonth - 1, parteDay).getTime() < 14 * 86_400_000;
+  const parteTimestamp = new Date(parteYear, parteMonth - 1, parteDay).getTime();
+  const parteAgeMs = Date.now() - parteTimestamp;
+  const parteFresh = Number.isFinite(parteTimestamp) && parteAgeMs >= 0 && parteAgeMs < 14 * 86_400_000;
 
   const hits = useMemo(() => {
     const n = q.trim();
@@ -135,7 +137,7 @@ export function HospitalShell({ children }: { children: ReactNode }) {
           </button>
         </form>
         <p className="px-3 text-xs text-nav-muted">
-          {typeof window !== "undefined" ? window.location.host : ""} · Parte {formatParteFecha()}
+          Parte de camas · {formatParteFecha()} · {parteFresh ? "vigente" : "no vigente"}
         </p>
       </div>
     </nav>
@@ -296,7 +298,7 @@ function AlertBar() {
   const style = level ? ALERT_BAR[level.color as keyof typeof ALERT_BAR] : undefined;
   if (!level || !style) return null;
   return (
-    <a href="/continuidad" className={`mb-3 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm ${style.box}`} role="status">
+    <a href="/continuidad/clima" className={`mb-3 flex items-center gap-2.5 rounded-xl border px-3 py-2 text-sm ${style.box}`} role="status">
       <span className={`size-2.5 shrink-0 rounded-full ${style.dot}`} />
       <span className="min-w-0"><b className="font-semibold">{level.grado ? `Alerta grado ${level.grado} de 9 · ${level.nombre}` : style.name}.</b> {level.motivos.slice(0, 2).map((reason) => `${reason.origen}: ${reason.texto}`).join(" · ")}</span>
       <span className="ml-auto shrink-0 text-xs font-medium underline">Ver</span>

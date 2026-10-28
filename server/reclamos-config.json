@@ -1,11 +1,9 @@
 {
-  "enabled": false,
+  "enabled": true,
   "exclude": [],
-  "hours": [
-    8,
-    16
-  ],
-  "leadDays": 3,
+  "hours": [8],
+  "leadDays": 4,
+  "startOn": "2026-10-28",
   "maxRecipients": 2,
   "activeWithinDays": 120
 }

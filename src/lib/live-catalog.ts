@@ -10,8 +10,8 @@ export type UnreadFile = { id: string; filename: string; mailDate: string; depar
 /** Guardia corregida a mano en la pantalla principal. Clave: "AAAA-MM-DD|servicio". */
 export type ManualDuty = { text: string; by: string; at: string };
 /** Reclamo de planillas faltantes, calculado por el servidor (scripts/reclamos.py). */
-export type ClaimInfo = { to: string[]; status: "pendiente" | "recibida" | "excluido" | "cancelado"; sent: number; lastSent: string | null };
-export type ClaimsState = { enabled: boolean; month: string | null; services: Record<string, ClaimInfo> };
+export type ClaimInfo = { to: string[]; defaultTo?: string[]; recipientSource?: "history" | "manual"; status: "pendiente" | "recibida" | "excluido" | "cancelado"; sent: number; lastSent: string | null };
+export type ClaimsState = { enabled: boolean; month: string | null; startsOn?: string | null; services: Record<string, ClaimInfo> };
 type LiveState = { generatedAt: string | null; mailAt: string | null; documents: GuardiaDoc[]; unread: UnreadFile[]; reclamos?: ClaimsState | null; manual?: Record<string, ManualDuty> };
 
 function validDoc(value: unknown): value is GuardiaDoc {
@@ -22,12 +22,17 @@ function validDoc(value: unknown): value is GuardiaDoc {
 function fromCache(): LiveState {
   try {
     const parsed = JSON.parse(storageGet(KEY) ?? "null") as Partial<LiveState> | null;
-    if (parsed && Array.isArray(parsed.documents)) return { generatedAt: parsed.generatedAt ?? null, mailAt: parsed.mailAt ?? null, documents: parsed.documents.filter(validDoc), unread: Array.isArray(parsed.unread) ? parsed.unread : [] };
+    if (parsed && Array.isArray(parsed.documents)) return { generatedAt: parsed.generatedAt ?? null, mailAt: parsed.mailAt ?? null, documents: parsed.documents.filter(validDoc), unread: Array.isArray(parsed.unread) ? parsed.unread : [], manual: parsed.manual ?? {}, reclamos: parsed.reclamos ?? null };
   } catch { /* caché ilegible: se vuelve a pedir */ }
   return { generatedAt: null, mailAt: null, documents: [], unread: [] };
 }
 
 let state: LiveState = fromCache();
+let connectivity: 'checking' | 'online' | 'degraded' = 'checking';
+export function catalogConnectivity() { return connectivity; }
+function connection(next: typeof connectivity) {
+  if (next !== connectivity) { connectivity = next; window.dispatchEvent(new Event('schestakow-connectivity')); }
+}
 
 export function liveDocuments(): GuardiaDoc[] {
   return state.documents;
@@ -65,6 +70,7 @@ type LiveResponse = { generatedAt: string | null; documents: unknown[]; unread?:
 
 async function fetchLive(): Promise<LiveResponse> {
   const response = await fetch("/api/catalog/live", { signal: AbortSignal.timeout(10_000) });
+  if (response.status === 401 || response.status === 403) { storageSet(KEY, ''); window.location.assign('/login'); }
   if (!response.ok) throw new Error(`catalog_live_${response.status}`);
   return response.json() as Promise<LiveResponse>;
 }
@@ -73,10 +79,11 @@ async function fetchLive(): Promise<LiveResponse> {
 export async function refreshLive(): Promise<boolean> {
   try {
     const data = await fetchLive();
+    connection("online");
     const documents = (Array.isArray(data.documents) ? data.documents : []).filter(validDoc);
     const unread = (Array.isArray(data.unread) ? data.unread : []).filter((item) => item && typeof item.id === "string" && typeof item.filename === "string");
     const next: LiveState = { generatedAt: data.generatedAt ?? null, mailAt: data.mail?.at ?? null, documents, unread, reclamos: data.reclamos && typeof data.reclamos.services === "object" ? data.reclamos : null, manual: data.manual && typeof data.manual === "object" ? data.manual : {} };
-    const changed = next.generatedAt !== state.generatedAt || next.mailAt !== state.mailAt || documents.length !== state.documents.length || unread.length !== state.unread.length || JSON.stringify(next.reclamos ?? null) !== JSON.stringify(state.reclamos ?? null) || JSON.stringify(next.manual ?? {}) !== JSON.stringify(state.manual ?? {});
+    const changed = next.generatedAt !== state.generatedAt || next.mailAt !== state.mailAt || JSON.stringify(documents) !== JSON.stringify(state.documents) || unread.length !== state.unread.length || JSON.stringify(next.reclamos ?? null) !== JSON.stringify(state.reclamos ?? null) || JSON.stringify(next.manual ?? {}) !== JSON.stringify(state.manual ?? {});
     state = next;
     if (changed) {
       const raw = JSON.stringify(next);
@@ -85,11 +92,21 @@ export async function refreshLive(): Promise<boolean> {
     }
     return true;
   } catch {
+    connection("degraded");
     return false;
   }
 }
 
-/** Cancela o reanuda el reclamo automático de un servicio para el mes en curso. */
+/** Cambia los destinatarios del servicio; null vuelve a los remitentes anteriores. */
+export async function saveClaimRecipients(slug: string, to: string[] | null): Promise<boolean> {
+  try {
+    const response = await fetch("/api/reclamos/recipients", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, to }), signal: AbortSignal.timeout(10_000) });
+    if (!response.ok) return false;
+    return refreshLive();
+  } catch { return false; }
+}
+
+/** Suspende o reanuda el reclamo del mes solicitado sin cambiar sus destinatarios. */
 export async function pauseClaim(slug: string, paused: boolean): Promise<boolean> {
   try {
     const response = await fetch("/api/reclamos/pause", { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ slug, paused }), signal: AbortSignal.timeout(10_000) });

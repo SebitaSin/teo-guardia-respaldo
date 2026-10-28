@@ -14,7 +14,6 @@ const FILTERS: { id: BedFilter; label: string }[] = [
   { id: "ocupada", label: "Ocupadas" },
   { id: "libre", label: "Libres" },
   { id: "arm", label: "ARM" },
-  { id: "revisar", label: "A confirmar" },
 ];
 
 function boardLine(board: Board) {
@@ -58,7 +57,6 @@ export function ServiciosUnificados({ slug }: { slug?: string }) {
           <Link key={item.slug} to="/internados/$slug" params={{ slug: item.slug }} className={cn("flex h-11 shrink-0 items-center gap-2 rounded-lg px-3 text-sm font-medium", slug === item.slug ? "bg-fg text-bg" : "bg-surface shadow-[var(--shadow-border)]")}>
             <span className={cn("size-2 rounded-full", boardFor(item.slug) ? "bg-ok" : "bg-border")} aria-hidden />
             {item.name}
-            {item.revisar && boardFor(item.slug) ? <span className="rounded-full bg-warn px-1.5 text-xs text-white">{item.revisar}</span> : null}
           </Link>
         ))}
       </nav>
@@ -75,7 +73,7 @@ export function ServiciosUnificados({ slug }: { slug?: string }) {
               <h1 className="text-[1.6rem] font-semibold tracking-tight">{selected.name}</h1>
               <p className="mt-1 text-muted">{selected.ocupadas} ocupadas · {selected.libres} libres{selected.desconocidas ? ` · ${selected.desconocidas} sin dato` : ""}</p>
               {board
-                ? <p className="mt-1 text-sm">{boardLine(board)}<Turno board={board} />{selected.revisar ? <span className="ml-2 font-medium text-warn">{selected.revisar} a confirmar</span> : <span className="ml-2 text-ok">sin pendientes</span>}</p>
+                ? <p className="mt-1 text-sm">{boardLine(board)}<Turno board={board} /></p>
                 : <p className="mt-1 rounded-lg border border-danger/50 bg-danger/10 p-2 text-sm">Sin pizarra nueva. Lo que sigue es el parte del {formatParteFecha()}: no representa la ocupación actual.</p>}
               {guardia ? <Link to="/servicios/$slug" params={{ slug: guardia.slug }} className="mt-2 inline-block text-sm font-medium text-primary">Guardia y cronograma de {guardia.name}</Link> : null}
             </header>
@@ -98,7 +96,7 @@ export function ServiciosUnificados({ slug }: { slug?: string }) {
                     <p className="text-xs text-muted">{item.ocupadas} ocupadas de {item.total} · {item.libres} libres</p>
                     <p className="mt-1 text-xs">
                       {board
-                        ? <>{new Date(board.foto_fecha).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}{item.revisar ? <span className="ml-1 rounded-full bg-warn px-1.5 font-medium text-white">{item.revisar} a confirmar</span> : null}</>
+                        ? new Date(board.foto_fecha).toLocaleString("es-AR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })
                         : <span className="text-danger">sin pizarra nueva</span>}
                     </p>
                   </Link>

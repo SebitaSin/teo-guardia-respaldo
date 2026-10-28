@@ -1,0 +1,639 @@
+{
+ "nota": "Las camas enumeradas en las planillas en blanco entregadas por Sebastian son el limite fisico por servicio, por indicacion expresa del 26/10/2026. Las fuentes adicionales con numeracion visible se identifican por hash. Una lista vacia significa capacidad no determinada; nunca cero camas ni permiso para crear camas.",
+ "planillas": [
+  {
+   "titulo": "CLÍNICA MÉDICA I",
+   "servicio": "Clínica Médica 2",
+   "slug": "clinica-2",
+   "alias": [
+    "CLINICA MEDICA I"
+   ],
+   "solo_titulo": true,
+   "columnas": [
+    "SALA Y CAMA",
+    "FECHA INGRESO",
+    "EDAD",
+    "NOMBRE Y APELLIDO",
+    "DIAGNÓSTICO",
+    "MUTUAL / DNI"
+   ],
+   "camas": [
+    "515/1",
+    "515/2",
+    "516/1",
+    "516/2",
+    "517/1",
+    "517/2",
+    "518/1",
+    "518/2",
+    "519/1",
+    "519/2",
+    "520/1",
+    "520/2",
+    "521/1",
+    "521/2",
+    "522/1",
+    "522/2",
+    "523/1",
+    "523/2",
+    "524/1",
+    "525/1",
+    "526/1"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "SALUD MENTAL",
+   "servicio": "Salud Mental",
+   "slug": "salud-mental",
+   "alias": [
+    "SALUD MENTAL"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "HAB",
+    "APELLIDO",
+    "NOMBRE",
+    "EDAD",
+    "DNI",
+    "HC",
+    "DX",
+    "OS"
+   ],
+   "camas": [
+    "1/1",
+    "1/2",
+    "2/1",
+    "2/2",
+    "3/1",
+    "3/2",
+    "4/1",
+    "4/2",
+    "5/1",
+    "5/2",
+    "6/1",
+    "6/2",
+    "7/1",
+    "7/2",
+    "8/1",
+    "9/1",
+    "9/2",
+    "10/1",
+    "10/2",
+    "11/1",
+    "11/2"
+   ]
+  },
+  {
+   "titulo": "UCCYQ",
+   "servicio": "UCCyQ",
+   "slug": "uccyq",
+   "alias": [
+    "UCCYQ",
+    "UCCQ"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "HAB",
+    "APELLIDO NOMBRE",
+    "EDAD",
+    "O. SOCIAL",
+    "DNI",
+    "DIAGNOSTICO",
+    "FECHA"
+   ],
+   "camas": [
+    "317/1",
+    "317/2",
+    "318",
+    "319",
+    "320",
+    "321",
+    "322",
+    "323",
+    "325",
+    "326"
+   ]
+  },
+  {
+   "titulo": "PEDIATRIA ALA ESTE",
+   "servicio": "Pediatría Ala Este",
+   "slug": "pediatria-este",
+   "alias": [
+    "PEDIATRIA ALA ESTE",
+    "ALA ESTE",
+    "PED ALA ESTE"
+   ],
+   "columnas": [
+    "Habitación y número de cama, con una línea para el nombre"
+   ],
+   "camas": [
+    "115/1",
+    "115/2",
+    "115/3",
+    "115/4",
+    "115/5",
+    "115/6",
+    "116/1",
+    "116/2",
+    "116/3",
+    "116/4",
+    "116/5",
+    "116/6",
+    "117/1",
+    "117/2",
+    "117/3",
+    "117/4",
+    "117/5",
+    "117/6",
+    "118/1",
+    "118/2",
+    "118/3",
+    "118/4",
+    "118/5",
+    "118/6",
+    "119/1",
+    "119/2",
+    "119/3",
+    "120/1",
+    "121/1",
+    "122/1"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "PEDIATRÍA ALA NORTE",
+   "servicio": "Pediatría Ala Norte",
+   "slug": "pediatria-norte",
+   "alias": [
+    "PEDIATRIA ALA NORTE",
+    "ALA NORTE",
+    "PED ALA NORTE"
+   ],
+   "columnas": [
+    "Habitación y número de cama, con una línea para el nombre"
+   ],
+   "camas": [
+    "103/1",
+    "103/2",
+    "103/3",
+    "104/1",
+    "104/2",
+    "104/3",
+    "105/1",
+    "105/2",
+    "105/3",
+    "106/1",
+    "106/2",
+    "106/3",
+    "107/1",
+    "107/2",
+    "107/3",
+    "107/4",
+    "107/5",
+    "107/6",
+    "108/1"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "PLANILLA DE PACIENTES INTERNADOS UTI A",
+   "servicio": "UTI adultos",
+   "slug": "terapia-intensiva",
+   "alias": [
+    "UTI A",
+    "UTIA",
+    "UTI ADULTOS",
+    "TERAPIA INTENSIVA ADULTOS",
+    "TERAPIA ADULTOS",
+    "UTI"
+   ],
+   "columnas": [
+    "CAMA",
+    "APELLIDO Y NOMBRE",
+    "HC",
+    "DNI",
+    "EDAD",
+    "OBRA SOCIAL",
+    "FECHA NAC.",
+    "INGRESO",
+    "DIAGNOSTICO"
+   ],
+   "camas": [
+    "1",
+    "2",
+    "3",
+    "4",
+    "5",
+    "6",
+    "7",
+    "8",
+    "9",
+    "10"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "UCO",
+   "servicio": "UCO",
+   "slug": "uco",
+   "alias": [
+    "UCO"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "CAMA",
+    "APELLIDO Y NOMBRE",
+    "EDAD",
+    "FECHA INGR",
+    "DNI",
+    "DIAG",
+    "OBRA SOCIAL",
+    "OTROS"
+   ],
+   "camas": [
+    "C/1",
+    "C/2",
+    "C/3",
+    "C/4",
+    "C/5",
+    "C/6"
+   ]
+  },
+  {
+   "titulo": "UTI PEDIATRICA",
+   "servicio": "UTI pediátrica",
+   "slug": "tip",
+   "alias": [
+    "UTI PEDIATRICA",
+    "UTI PED",
+    "UTIP",
+    "TERAPIA PEDIATRICA"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "CAMA",
+    "APELLIDO Y NOMBRE",
+    "EDAD",
+    "F. INGRESO",
+    "DNI",
+    "DIAGN.",
+    "O. SOCIAL",
+    "OTROS"
+   ],
+   "camas": [
+    "01",
+    "02",
+    "03",
+    "04",
+    "05",
+    "06",
+    "07",
+    "08"
+   ]
+  },
+  {
+   "titulo": "GINECOLOGIA",
+   "servicio": "Ginecología",
+   "slug": "ginecologia",
+   "alias": [
+    "GINECOLOGIA"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "SALA Y CAMA",
+    "APELLIDO Y NOMBRE",
+    "EDAD",
+    "DIAGNÓSTICO",
+    "FECHA - HORA",
+    "MUTUAL",
+    "D.N.I"
+   ],
+   "camas": [
+    "416/1",
+    "416/2",
+    "417/1",
+    "417/2",
+    "418/1",
+    "418/2",
+    "419/1",
+    "419/2",
+    "420/1",
+    "420/2",
+    "421/1",
+    "421/2",
+    "422/1",
+    "422/2",
+    "423/1",
+    "423/2",
+    "425",
+    "426"
+   ],
+   "fuente_camas": {
+    "tipo": "pizarra con numeracion visible",
+    "hash": "9585e4e45a140cd7f7f3f4d4220f81132ef75be527aae7ffabd870c98a67d8d8",
+    "revisada": "2026-10-26"
+   }
+  },
+  {
+   "titulo": "TRAUMATOLOGIA",
+   "servicio": "Traumatología",
+   "slug": "traumatologia",
+   "alias": [
+    "TRAUMATOLOGIA",
+    "TRAUMATO"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "SALA",
+    "APELLIDO Y NOMBRE",
+    "HC / DNI",
+    "DIAGNOSTICO",
+    "FECHA INGRESO",
+    "MUTUAL",
+    "OBRA SOCIAL",
+    "EDAD"
+   ],
+   "camas": [
+    "401/1",
+    "401/2",
+    "402/1",
+    "402/2",
+    "403/1",
+    "403/2",
+    "404/1",
+    "404/2",
+    "405/1",
+    "405/2",
+    "406/1",
+    "406/2",
+    "407/1",
+    "407/2",
+    "408/1",
+    "408/2",
+    "409/1",
+    "409/2",
+    "410",
+    "411",
+    "412"
+   ]
+  },
+  {
+   "titulo": "S.I.A.P.S.",
+   "servicio": "Pediatria / adolescentes",
+   "slug": "pediatria-adolescentes",
+   "alias": [
+    "S I A P S",
+    "SIAPS"
+   ],
+   "camas_sin_confirmar": false,
+   "columnas": [
+    "SALA",
+    "APELLIDO Y NOMBRE",
+    "EDAD",
+    "DIAGNÓSTICO",
+    "FECHA - HORA",
+    "MUTUAL",
+    "D.N.I",
+    "HC Nº",
+    "FECHA DE NACIMIENTO",
+    "PERMISO DE SALIDA"
+   ],
+   "camas": [
+    "6/1",
+    "6/2",
+    "7/1",
+    "7/2",
+    "7/3",
+    "8/1",
+    "8/2",
+    "1/1",
+    "1/2",
+    "1/3"
+   ],
+   "fuente_camas": {
+    "tipo": "planilla en blanco y pizarra con las mismas diez ubicaciones",
+    "hash": "4698acae9bfd7496eafa7a0714ff549b50d143225ef46fa174ed630e48cb06d6",
+    "revisada": "2026-10-26"
+   }
+  },
+  {
+   "titulo": "UROLOGIA",
+   "servicio": "Urología",
+   "slug": "urologia",
+   "alias": [
+    "UROLOGIA"
+   ],
+   "columnas": [
+    "(cama)",
+    "APELLIDO Y NOMBRE",
+    "EDAD",
+    "HISTORIA CLINICA",
+    "D.N.I.",
+    "MUTUAL",
+    "DIAGNÓSTICO",
+    "POST QUIRÚRGICO",
+    "FECHA Y HORA DE INGRESO",
+    "ANT. PATOLÓGICOS"
+   ],
+   "camas": [
+    "615/1",
+    "615/2",
+    "616/1",
+    "616/2",
+    "617/1",
+    "617/2",
+    "618/1",
+    "618/2"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "CIRUGIA",
+   "servicio": "Cirugía",
+   "slug": "cirugia",
+   "alias": [
+    "CIRUGIA"
+   ],
+   "columnas": [
+    "SALA",
+    "APELLIDO Y NOMBRE / DIAGNOSTICO / ENFERMEDADES CRONICAS",
+    "MUTUAL",
+    "EDAD",
+    "H.C. / FECHA Y HORA DE INGRESO"
+   ],
+   "camas": [
+    "301/1",
+    "301/2",
+    "302/1",
+    "302/2",
+    "303/1",
+    "303/2",
+    "304/1",
+    "304/2",
+    "305/1",
+    "305/2",
+    "306/1",
+    "306/2",
+    "307/1",
+    "307/2",
+    "308/1",
+    "308/2",
+    "309/1",
+    "309/2",
+    "310",
+    "311",
+    "312",
+    "313",
+    "314"
+   ],
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "MATERNIDAD",
+   "servicio": "Maternidad",
+   "slug": "obstetricia",
+   "alias": [
+    "MATERNIDAD",
+    "OBSTETRICIA"
+   ],
+   "columnas": [],
+   "camas": [
+    "201-1",
+    "201-2",
+    "202-1",
+    "202-2",
+    "203-1",
+    "204-1",
+    "204-2",
+    "203-2",
+    "205-1",
+    "205-2",
+    "206-1",
+    "206-2",
+    "207-1",
+    "207-2",
+    "208-1",
+    "208-2",
+    "209-1",
+    "209-2",
+    "209-3",
+    "210-1",
+    "210-2",
+    "211",
+    "212-1",
+    "212-2"
+   ],
+   "camas_sin_confirmar": false,
+   "fuente_camas": {
+    "tipo": "pizarra con numeracion visible",
+    "hash": "65a959a52d84ea2c455c573d75751bd7d3a49b67c4c6e1560b55c0717ebe10ec",
+    "revisada": "2026-10-26"
+   }
+  },
+  {
+   "titulo": "NEONATOLOGIA",
+   "servicio": "Neonatología",
+   "slug": "neonatologia",
+   "alias": [
+    "NEONATOLOGIA",
+    "NEO"
+   ],
+   "columnas": [],
+   "camas": [],
+   "camas_sin_confirmar": true
+  },
+  {
+   "titulo": "CLINICA MEDICA 1",
+   "servicio": "Clínica Médica 1",
+   "slug": "clinica-1",
+   "alias": [
+    "CLINICA MEDICA 1"
+   ],
+   "columnas": [],
+   "camas": [
+    "2/1",
+    "2/2",
+    "3/1",
+    "3/2",
+    "4/1",
+    "4/2",
+    "5/1",
+    "5/2",
+    "6/1",
+    "6/2",
+    "7/1",
+    "7/2",
+    "8/1",
+    "8/2",
+    "9/1",
+    "9/2",
+    "10",
+    "11",
+    "12",
+    "13",
+    "14"
+   ],
+   "fuente_camas": {
+    "tipo": "pizarra con numeracion visible",
+    "hash": "deed3e07b996304f9ebad85ec0d9c252905d195bd9d9286bfce9a8ccded004d4",
+    "revisada": "2026-10-26"
+   },
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "CLINICA MEDICA 3",
+   "servicio": "Clínica Médica 3",
+   "slug": "clinica-3",
+   "alias": [
+    "CLINICA MEDICA 3"
+   ],
+   "columnas": [],
+   "camas": [
+    "601/1",
+    "601/2",
+    "602/1",
+    "602/2",
+    "603/1",
+    "603/2",
+    "604/1",
+    "604/2",
+    "605/1",
+    "605/2",
+    "606/1",
+    "606/2",
+    "607/1",
+    "607/2",
+    "608/1",
+    "608/2",
+    "609/1",
+    "609/2",
+    "610",
+    "611",
+    "612",
+    "613"
+   ],
+   "fuente_camas": {
+    "tipo": "pizarra con numeracion visible",
+    "hash": "36124fd9920e5210daac1000a930109f21db6f66b0284b171f33d7ded57dd899",
+    "revisada": "2026-10-26"
+   },
+   "camas_sin_confirmar": false
+  },
+  {
+   "titulo": "SIIAPS",
+   "servicio": "SIIAPS",
+   "slug": "siiaps",
+   "alias": [
+    "SIIAPS"
+   ],
+   "columnas": [],
+   "camas": [],
+   "fuente_camas": {
+    "tipo": "sin imagen de capacidad localizada",
+    "revisada": "2026-10-26"
+   },
+   "camas_sin_confirmar": true
+  }
+ ]
+}

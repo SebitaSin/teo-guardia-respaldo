@@ -18,7 +18,7 @@ export const CAMA_MAPA: CamaServicio[] = [
   { slug: "clinica-2", name: "Clínica Médica 2", piso: "5º", rango: "515–528" },
   { slug: "clinica-3", name: "Clínica Médica 3", piso: "6º", rango: "601–614" },
   { slug: "urologia", name: "Urología", piso: "6º", rango: "615 en adelante" },
-  { slug: "uco", name: "UCO", piso: "Unidad", rango: "1–8" },
+  { slug: "uco", name: "UCO", piso: "Unidad", rango: "1–6" },
   { slug: "terapia-intensiva", name: "UTI adultos", piso: "Unidad", rango: "1–10" },
   { slug: "tip", name: "UTI pediátrica", piso: "Unidad", rango: "1–6" },
   { slug: "salud-mental", name: "Salud Mental", piso: "Unidad", rango: "—" },

@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent } from "react";
-import { AlertTriangle, Camera, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudSnow, CloudSun, ExternalLink, Radar, CloudRain, Minus, Pause, Play, Plus, Radio, ShieldCheck, Snowflake, Sparkles, Sun, Thermometer, Wind } from "lucide-react";
+import { AlertTriangle, Camera, Cloud, CloudDrizzle, CloudFog, CloudLightning, CloudSnow, CloudSun, ExternalLink, Radar, CloudRain, Minus, Pause, Play, Plus, Radio, ShieldCheck, Snowflake, Sun, Thermometer, Wind } from "lucide-react";
 import { cn } from "@/lib/utils";
 
 /* ----------------------------- datos del servidor ----------------------------- */
 type Nivel = "amarillo" | "naranja" | "rojo";
-type Oficial = { evento: string; nivel: Nivel; desde: string; hasta: string; emitido: string; descripcion: string; instrucciones: string; alcance: "LOCAL" | "REGIONAL"; distancia_km: number; poligonos: [number, number][][]; url: string };
+type Oficial = { evento: string; nivel: Nivel; desde: string; hasta: string; emitido: string; descripcion: string; instrucciones: string; alcance: "LOCAL" | "REGIONAL"; distancia_km: number; poligonos: [number, number][][]; url: string; vigente?: boolean; operativa?: boolean };
 type Calculada = { tipo: string; titulo: string; nivel: Nivel; desde: string; hasta: string; detalle: string };
 type Hora = { t: string; temp: number | null; rh: number | null; rain: number | null; prob: number | null; gust: number | null; cape: number | null; frz: number | null };
 type Dia = { fecha: string; code: number | null; tmax: number | null; tmin: number | null; lluvia: number | null; prob: number | null; rafaga: number | null; dir: number | null; acuerdo: "alto" | "medio" | "bajo" | null; otros: { nombre: string; lluvia: number | null; tmax: number | null }[] };
@@ -451,7 +451,7 @@ function TenDays({ data }: { data: Extendido }) {
 export function ClimaPanel() {
   const { data, failed } = useClima();
   if (!data) return <p className="rounded-2xl bg-surface p-4 text-sm text-muted shadow-[var(--shadow-border)]">{failed ? "No se pudo consultar el estado del tiempo. Se reintenta sola en unos minutos." : "Consultando alertas, pronóstico y satélite…"}</p>;
-  const oficiales = data.oficial.datos?.alertas ?? [];
+  const oficiales = (data.oficial.datos?.alertas ?? []).filter((alert) => alert.vigente !== false && Date.parse(alert.hasta) >= Date.now());
   const locales = oficiales.filter((alert) => alert.alcance === "LOCAL");
   const regionales = oficiales.filter((alert) => alert.alcance === "REGIONAL");
   const forecast = data.pronostico.datos;
@@ -488,16 +488,16 @@ export function ClimaPanel() {
             {level.motivos.length ? (
               <ul className="mt-1.5 space-y-1">{level.motivos.map((reason, index) => <li key={index} className="flex gap-2"><span className={cn("mt-0.5 grid size-5 shrink-0 place-items-center rounded-md text-[0.7rem] font-bold text-white", LEVEL_STYLE[reason.nivel]?.dot)}>{reason.grado ?? ""}</span><span><b className="font-semibold">{reason.origen}:</b> {reason.texto}</span></li>)}</ul>
             ) : (
-              <p className="mt-1">{data.oficial.ok ? `Ni el SMN, ni el radar, ni el pronóstico de 48 horas marcan riesgo para la ciudad.${regionales.length ? ` En la región: ${[...new Set(regionales.map((alert) => `${alert.evento.toLowerCase()} a ${alert.distancia_km} km`))].join(", ")}.` : ""}` : "Sin motivos de alerta en lo que se pudo consultar."}</p>
+              <p className="mt-1">Sin motivos locales activos para elevar el nivel en las fuentes consultadas.</p>
             )}
-            {level.incompleto ? <p className="mt-1 font-semibold text-warn">{blind ? `No se puede decir "sin riesgo": no hay datos de ${(level.faltan ?? []).join(", ") || "alguna fuente"}. Grado mínimo ${grade}.` : `Sin datos de ${(level.faltan ?? []).join(", ") || "alguna fuente"}: el grado puede ser mayor.`}</p> : null}
+            {level.incompleto ? <p className="mt-1 text-sm text-muted">Faltan datos actualizados de {(level.faltan ?? []).join(", ") || "alguna fuente"}. El nivel refleja sólo las fuentes disponibles.</p> : null}
             {grade >= 6 && level.motivos.some((reason) => (reason.grado ?? 0) >= 6) ? <p className="mt-1 text-xs text-fg/70">Grado calculado en forma automática, con umbrales todavía sin contrastar con eventos reales de San Rafael: lo confirma el jefe de guardia antes de activar el plan.</p> : null}
           </div>
         </div>
         {level.escala ? (
           <details className="mt-3 border-t border-fg/10 pt-2 text-sm">
             <summary className="cursor-pointer text-xs font-semibold text-fg/70">Cómo se calcula el grado y qué pide cada uno</summary>
-            <p className="mt-2 text-xs text-fg/70">El grado sale de dos cosas: qué tan grave es el fenómeno y qué tan seguro es que afecte a la ciudad (pronóstico lejano, alerta oficial o dentro de 6 horas, u observado en el radar sobre San Rafael). Vale el más alto entre SMN, radar, sismos y pronóstico. En el radar cuenta la superficie de eco fuerte sobre la ciudad, no un punto; una celda lejana sólo cuenta si es grande y el viento en altura la trae. Los grados altos del radar piden que el núcleo se repita en dos barridos seguidos. El radar solo no alcanza para alertar por granizo: tiene que acompañarlo una alerta del SMN para la zona, inestabilidad en el pronóstico o lluvia fuerte medida cerca. El pronóstico solo, sin alerta del SMN, no pasa de grado 5. Por clima se llega hasta 8; el 9 queda para un sismo destructivo. Un grado de 5 o más baja de a un escalón cada 30 minutos. Para llegar a rojo por tormenta hace falta ver el núcleo de granizo a menos de 8 km del hospital en dos barridos. Todavía no cubre bien los aluviones en Valle Grande ni en el Cañón del Atuel. En los sismos, la intensidad es estimada, no medida. Las acciones son una propuesta: las valida la Dirección.</p>
+            <p className="mt-2 text-xs text-fg/70">El nivel usa avisos que cubren la ciudad y tienen vigencia actual o inicio dentro de seis horas, radar actualizado y mediciones pertinentes. Los avisos fuera del polígono de San Rafael quedan como información regional. Un núcleo de radar intenso debe seguir presente en la imagen actual y repetirse en otros barridos; la trayectoria por viento es una estimación. Una celda estacionaria fuera de la ciudad no confirma un aluvión. Las fuentes vencidas y el historial no sostienen por sí solos un nivel alto. El pronóstico es una previsión, no un fenómeno observado. La intensidad sísmica es aproximada: no confirma daños ni declara una catástrofe. Las acciones se revisan con Dirección antes de activar el plan.</p>
             <ol className="mt-2 grid gap-1 sm:grid-cols-2 lg:grid-cols-3">
               {level.escala.map((step) => <li key={step.grado} className={cn("flex gap-2 rounded-lg bg-surface/70 p-2 text-xs", step.grado === grade && "ring-2 ring-fg/60")}><span className={cn("grid size-6 shrink-0 place-items-center rounded-md font-bold text-white", LEVEL_STYLE[step.grado >= 7 ? "rojo" : step.grado >= 5 ? "naranja" : step.grado >= 3 ? "amarillo" : "verde"].dot)}>{step.grado}</span><span><b className="font-semibold">{step.nombre}.</b> {step.accion}</span></li>)}
             </ol>
@@ -507,7 +507,7 @@ export function ClimaPanel() {
 
       {data.parte?.texto ? (
         <section className="rounded-2xl bg-surface p-4 shadow-[var(--shadow-border)]">
-          <h2 className="flex items-center gap-2 text-sm font-semibold"><Sparkles className="size-4 text-primary" />Parte para el hospital<span className="text-xs font-normal text-muted">· redactado por IA a las {hhmm(data.parte.en)} h con los datos de esta pantalla</span></h2>
+          <h2 className="flex items-center gap-2 text-sm font-semibold"><Cloud className="size-4 text-primary" />Resumen para San Rafael<span className="text-xs font-normal text-muted">· actualizado a las {hhmm(data.parte.en)} h con avisos locales</span></h2>
           <p className="mt-1.5 text-sm leading-relaxed">{data.parte.texto}</p>
         </section>
       ) : null}
@@ -534,19 +534,19 @@ export function ClimaPanel() {
 
           {/* Alertas oficiales */}
           <section className="rounded-2xl bg-surface p-3 shadow-[var(--shadow-border)]">
-            <h2 className="text-sm font-semibold">Alertas oficiales del SMN</h2>
-            {!oficiales.length ? <p className="mt-1 text-sm text-muted">{data.oficial.ok ? "Ninguna vigente para San Rafael ni a menos de 150 km." : "Sin dato: no se pudo consultar al SMN."}</p> : (
+            <h2 className="text-sm font-semibold">Avisos oficiales para San Rafael</h2>
+            {!locales.length ? <p className="mt-1 text-sm text-muted">{data.oficial.ok ? "Ningún aviso vigente que cubra la ciudad." : "Sin dato: no se pudo consultar al SMN."}</p> : (
               <ul className="mt-2 space-y-2">
-                {oficiales.map((alert, index) => { const Icon = iconFor(alert.evento); return (
+                {locales.map((alert, index) => { const Icon = iconFor(alert.evento); return (
                   <li key={index} className={cn("rounded-xl border p-2.5", NIVEL_STYLE[alert.nivel].card)}>
                     <div className="flex items-center gap-2"><Icon className="size-4 shrink-0" /><span className="min-w-0 flex-1 text-sm font-semibold">{alert.evento}</span><span className={cn("shrink-0 rounded-full px-2 py-0.5 text-[0.65rem] font-semibold uppercase", NIVEL_STYLE[alert.nivel].chip)}>{NIVEL_STYLE[alert.nivel].label}</span></div>
-                    <p className="mt-1 text-xs font-medium">{alert.alcance === "LOCAL" ? "Cubre San Rafael" : `En la región, a ${alert.distancia_km} km`} · {when(alert.desde)} a {when(alert.hasta)}</p>
+                    <p className="mt-1 text-xs font-medium">Cubre San Rafael · {Date.parse(alert.desde) > Date.now() ? "Previsto: " : "Vigente: "}{when(alert.desde)} a {when(alert.hasta)}</p>
                     <details className="mt-1 text-xs text-fg/80"><summary className="cursor-pointer font-medium">Qué dice y qué recomienda</summary><p className="mt-1">{alert.descripcion}</p>{alert.instrucciones ? <p className="mt-1">{alert.instrucciones}</p> : null}</details>
                   </li>
                 ); })}
               </ul>
             )}
-            {locales.length === 0 && regionales.length > 0 ? <p className="mt-2 text-xs text-muted">Las de la región no cubren la ciudad, pero pueden afectar rutas y derivaciones.</p> : null}
+            {regionales.length > 0 ? <details className="mt-3 border-t border-border pt-2 text-xs text-muted"><summary className="cursor-pointer font-medium">Información regional · {regionales.length} avisos fuera de la ciudad</summary><p className="mt-2">No cubren San Rafael ni elevan por sí solos el nivel del hospital. La afectación de rutas y derivaciones requiere información específica.</p><ul className="mt-2 space-y-2">{regionales.map((alert, index) => <li key={index} className="rounded-lg border border-border p-2"><b>{alert.evento}</b> · {alert.distancia_km} km de la ciudad · nivel oficial {alert.nivel}<p>{when(alert.desde)} a {when(alert.hasta)}</p><a href={alert.url} target="_blank" rel="noreferrer" className="underline">Ver aviso del SMN</a></li>)}</ul></details> : null}
           </section>
 
           {/* Alertas tempranas */}

@@ -2,7 +2,17 @@
 
 Leer antes de tocar nada: `OBJETIVO.md` y `ESTADO.md`.
 
-## Una sola herramienta
+## Autorización actual
+
+24/10/2026: Sebastián pidió expresamente a Codex auditar y corregir este proyecto existente, probar WhatsApp oficial y preparar guardia.grok.me. Esta sesión modifica únicamente los archivos registrados en ESTADO.md; no crea otro proyecto. No se habilitan avisos automáticos.
+
+26/10/2026: Sebastián autoriza expresamente **reclamos automáticos por correo de los cronogramas mensuales**, una vez por día desde cuatro días antes del inicio del mes. Se detienen al identificar la planilla recibida de ese servicio y mes; la interfaz mantiene Suspender reclamo y permite cambiar el correo del responsable. Esta autorización reemplaza la prohibición anterior sólo para estos reclamos. No habilita avisos de clima, envíos automáticos por WhatsApp ni otras comunicaciones. Los destinatarios salen de los remitentes anteriores del servicio o de una corrección explícita hecha desde Cambiar datos.
+
+26/10/2026: ante la consulta específica por el tránsito de los datos personales de empleados a través de Cloudflare, Sebastián respondió **"autorizo"**. Se habilita por 24 horas un enlace público de Cloudflare limitado a la ficha `/mis-datos` y sus rutas públicas, guardando las respuestas en esta PC, con el túnel y el pasamanos en segundo plano. No se publica la app completa ni datos clínicos de pacientes.
+
+26/10/2026: a la pregunta directa por **enviar a OpenAI la imagen de la planilla de guardias de UCCyQ de octubre para leer los nombres de los médicos y sus días dentro del límite configurado**, Sebastián respondió **"Sí, autorizo esa planilla"**. Se registra la autorización por la huella del adjunto en `var/ai/schedule-pdf-approvals.json`; sólo ese PDF escaneado habilita la nueva extracción de su JPEG original para el lector de IA. La transcripción queda en caché y no se vuelve a pagar por la misma imagen.
+
+## Una sola herramienta (antecedente)
 
 - **Esta carpeta la modifica una sola herramienta: Claude.** Decisión de Sebastián del 5/10/2026: trabajar con dos a la vez generaba versiones cruzadas e instrucciones contradictorias.
 - ChatGPT u otra herramienta puede usarse para consultar o comparar ideas, pero no edita archivos de esta carpeta, no hace `git` acá y sus propuestas no cambian `OBJETIVO.md`.
@@ -51,3 +61,5 @@ npm run build
 ## Honestidad
 
 No escribir "completado" ni "funciona" sin haberlo visto funcionar con datos reales. Que exista el botón, compile o diga "API activa" no es prueba. Decir qué se probó, cómo, y qué limitación queda.
+
+27/10/2026: a la pregunta especifica por mantener la misma direccion publica de la ficha del personal activa hasta que el usuario pida cerrarla, limitada a esa ficha y sin publicar app completa ni pacientes, Sebastian respondio: "Si, mantenerlo activo hasta que yo pida cerrarlo". Esta autorizacion reemplaza el limite anterior de24horas para ese mismo enlace y alcance. Se puede retirar el cierre por horario preservando los procesos del servidor, pasamanos y tunel. Sigue siendo un tunel temporal que depende de la PC/conexion, no un dominio permanente ni una garantia ante cortes o reinicios.

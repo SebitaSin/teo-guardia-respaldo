@@ -1,5 +1,7 @@
 /** localStorage que no tumba la app. Cuota llena o modo privado: sigue con memoria. */
 
+const fallbackMemory = new Map<string, string>();
+
 function store(): Storage | null {
   try {
     if (typeof window === "undefined") return null;
@@ -14,7 +16,7 @@ function store(): Storage | null {
 
 export function storageGet(key: string): string | null {
   try {
-    return store()?.getItem(key) ?? null;
+    return store()?.getItem(key) ?? fallbackMemory.get(key) ?? null;
   } catch {
     return null;
   }
@@ -22,9 +24,10 @@ export function storageGet(key: string): string | null {
 
 export function storageSet(key: string, value: string): boolean {
   const s = store();
-  if (!s) return false;
+  if (!s) { fallbackMemory.set(key, value); return false; }
   try {
     s.setItem(key, value);
+    fallbackMemory.delete(key);
     return true;
   } catch {
     try {
@@ -37,6 +40,7 @@ export function storageSet(key: string, value: string): boolean {
       s.setItem(key, value);
       return true;
     } catch {
+      fallbackMemory.set(key, value);
       return false;
     }
   }

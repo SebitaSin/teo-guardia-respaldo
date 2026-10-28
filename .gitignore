@@ -61,3 +61,6 @@ Nuevo Documento de texto.txt
 
 # Programa de túnel (55 MB): se baja en cada PC, no se sube
 tools/cloudflared.exe
+
+# Binarios oficiales descargados para el instalador offline
+installer/downloads/

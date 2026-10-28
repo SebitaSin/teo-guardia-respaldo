@@ -80,13 +80,14 @@ test("WhatsApp bilateral: entrada firmada, borrador, aprobación, envío y acuse
   const login = await fetch(`${base}/api/login`, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "user=direccion&password=clave-de-prueba-segura" });
   const cookie = login.headers.get("set-cookie");
   const auth = { cookie, "content-type": "application/json" };
-  const inbound = { entry: [{ changes: [{ value: { messages: [{ id: "wamid.IN", from: "5492604056998", type: "text", text: { body: "Necesito confirmar mi guardia" } }] } }] }] };
+  const inbound = { entry: [{ changes: [{ value: { messages: [{ id: "wamid.IN", timestamp: String(Math.floor(Date.now() / 1000)), from: "5492604056998", type: "text", text: { body: "Necesito confirmar mi guardia" } }] } }] }] };
   const raw = JSON.stringify(inbound);
   const signature = `sha256=${createHmac("sha256", "app-secret-test").update(raw).digest("hex")}`;
   const accepted = await fetch(`${base}/api/whatsapp/webhook`, { method: "POST", headers: { "x-hub-signature-256": signature }, body: raw });
   assert.equal(accepted.status, 200);
   const inbox = await fetch(`${base}/api/communications`, { headers: { cookie } });
   assert.equal((await inbox.json()).items[0].text, "Necesito confirmar mi guardia");
+  await fetch(`${base}/api/whatsapp/consents`, { method: "POST", headers: auth, body: JSON.stringify({ phone: "2604056998", active: true, evidence: "Consentimiento explícito del fixture de prueba" }) });
   const draftResponse = await fetch(`${base}/api/whatsapp/outbox`, { method: "POST", headers: auth, body: JSON.stringify({ to: "2604056998", kind: "text", body: "Guardia confirmada", motivo: "respuesta operativa" }) });
   assert.equal(draftResponse.status, 201);
   const draft = (await draftResponse.json()).record;
@@ -241,7 +242,7 @@ test("exact staff locations are direction-only, encrypted at rest and absent fro
   assert.equal(blocked.status, 403);
 
   const maps = await fetch(`${base}/api/maps/config`, { headers: { cookie } });
-  assert.deepEqual(await maps.json(), { configured: false, browserKey: null, routesKey: null });
+  assert.deepEqual(await maps.json(), { configured: false, browserKey: null, routesConfigured: false });
 }));
 
 test("private staff address and phone are direction-only and encrypted at rest", () => running(async (base, ctx) => {
@@ -306,6 +307,26 @@ test("personal edits preserve all fields and mapped coordinates, but names are i
   assert.equal((await points.json()).locations.length, 0);
 }));
 
+test("Compartir GPS esta retirado: enlaces y API devuelven 404 sin modificar datos anteriores", () => running(async (base, ctx) => {
+  const storedPath = join(ctx.root, "data", "continuidad", "staff-gps.enc.json");
+  mkdirSync(join(ctx.root, "data", "continuidad"), { recursive: true });
+  writeFileSync(storedPath, "archivo cifrado anterior de prueba");
+  const before = readFileSync(storedPath);
+  for (const path of ["/mi-ubicacion", "/mi-ubicacion/", "/api/continuidad/gps/latest"]) {
+    const response = await fetch(`${base}${path}`, { redirect: "manual" });
+    assert.equal(response.status, 404);
+    assert.match(response.headers.get("permissions-policy") ?? "", /geolocation=\(\)/);
+  }
+  for (const user of ["direccion", "coordinacion", "chofer1", "consulta"]) {
+    const login = await fetch(`${base}/api/login`, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: `user=${user}&password=clave-de-prueba-segura` });
+    const headers = { cookie: login.headers.get("set-cookie"), "content-type": "application/json" };
+    for (const method of ["POST", "DELETE"]) {
+      assert.equal((await fetch(`${base}/api/continuidad/gps/location`, { method, headers, body: "{}" })).status, 404);
+    }
+    assert.equal((await fetch(`${base}/api/continuidad/gps/latest`, { headers })).status, 404);
+  }
+  assert.deepEqual(readFileSync(storedPath), before);
+}));
 test("personal groups persist mixed members and drafts encrypted; service groups reject other areas", () => running(async (base, ctx) => {
   const login = await fetch(`${base}/api/login`, { method: "POST", redirect: "manual", headers: { "content-type": "application/x-www-form-urlencoded" }, body: "user=direccion&password=clave-de-prueba-segura" });
   const headers = { cookie: login.headers.get("set-cookie"), "content-type": "application/json" };

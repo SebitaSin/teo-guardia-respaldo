@@ -4,13 +4,19 @@ import { nowIso } from "./hash";
 
 const HAIL_CODES = new Set([96, 99]);
 
+function modelTime(value: string, offsetSeconds: number): number {
+  if (!/^\d{4}-\d\d-\d\dT\d\d:\d\d/.test(value)) return NaN;
+  return /[zZ]$|[+-]\d\d:\d\d$/.test(value) ? Date.parse(value) : Date.parse(`${value}Z`) - offsetSeconds * 1000;
+}
+
 export type SimKind = "off" | "dry" | "rain" | "hail" | "api_down" | "access_closed";
 
 function windowFromHours(
   id: WeatherWindow["id"],
   hours: { time: string[]; precipitation?: number[]; weathercode?: number[]; weather_code?: number[]; windspeed_10m?: number[]; wind_speed_10m?: number[]; visibility?: number[]; precipitation_probability?: number[] },
-  startH: number,
-  endH: number,
+  startMs: number,
+  endMs: number,
+  offsetSeconds: number,
 ): WeatherWindow {
   const codes = hours.weather_code ?? hours.weathercode ?? [];
   const wind = hours.wind_speed_10m ?? hours.windspeed_10m ?? [];
@@ -24,7 +30,9 @@ function windowFromHours(
   let minV: number | null = null;
   let maxProb = 0;
   let n = 0;
-  for (let i = startH; i < Math.min(endH, precip.length || hours.time.length); i++) {
+  for (let i = 0; i < hours.time.length; i++) {
+    const at = modelTime(hours.time[i], offsetSeconds);
+    if (!Number.isFinite(at) || at < startMs || at >= endMs) continue;
     const mm = precip[i] ?? 0;
     p += mm;
     maxI = Math.max(maxI, mm);
@@ -58,6 +66,10 @@ export function parseOpenMeteo(raw: Record<string, unknown>, retrieved = nowIso(
     precipitation_probability?: number[];
   };
   const code = Number(current.weather_code ?? current.weathercode ?? 0);
+  const reportedOffset = Number(raw.utc_offset_seconds);
+  const offsetSeconds = raw.utc_offset_seconds != null && Number.isFinite(reportedOffset) ? reportedOffset : -3 * 3600;
+  const anchor = Math.floor(Date.parse(retrieved) / 3_600_000) * 3_600_000;
+  const window = (id: WeatherWindow["id"], start: number, end: number) => windowFromHours(id, hourly, anchor + start * 3_600_000, anchor + end * 3_600_000, offsetSeconds);
   const now: WeatherWindow = {
     id: "NOW",
     precip_mm: current.precipitation != null ? Number(current.precipitation) : current.rain != null ? Number(current.rain) : 0,
@@ -69,10 +81,10 @@ export function parseOpenMeteo(raw: Record<string, unknown>, retrieved = nowIso(
   };
   const windows: WeatherWindow[] = [
     now,
-    windowFromHours("0-2h", hourly, 0, 2),
-    windowFromHours("2-6h", hourly, 2, 6),
-    windowFromHours("6-12h", hourly, 6, 12),
-    windowFromHours("12-24h", hourly, 12, 24),
+    window("0-2h", 0, 2),
+    window("2-6h", 2, 6),
+    window("6-12h", 6, 12),
+    window("12-24h", 12, 24),
   ];
   const issued = String(current.time ?? hourly.time?.[0] ?? retrieved);
   const expires = new Date(Date.parse(retrieved) + cfg.weather_ttl_minutes * 60000).toISOString();
@@ -171,7 +183,7 @@ export function simulateWeather(kind: Exclude<SimKind, "off">): WeatherState {
       visibility: heavy ? 2000 : 20000,
     },
     hourly: {
-      time: Array.from({ length: 24 }, (_, i) => `h${i}`),
+      time: Array.from({ length: 24 }, (_, i) => new Date((Math.floor(Date.now() / 3_600_000) + i) * 3_600_000).toISOString()),
       precipitation: Array(24).fill(heavy ? precip / 3 : precip ? 1 : 0),
       weather_code: Array(24).fill(code),
       wind_speed_10m: Array(24).fill(hail ? 55 : 8),

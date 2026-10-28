@@ -2,7 +2,7 @@ import { resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import { appendAudit, readJson, writeJsonAtomic } from "./store.mjs";
 import { verifyOpenAi } from "./ai.mjs";
-import { createWaLink } from "./wa-link/supervisor.mjs";
+// WhatsApp: exclusivamente Cloud API oficial. No iniciar el receptor vinculado.
 import { createLabLookup } from "./lab-lookup.mjs";
 import { createHospitalServer } from "./app.mjs";
 import { loadAuthConfig } from "./auth.mjs";
@@ -29,15 +29,11 @@ for (const [key, value] of Object.entries(readJson(resolve(root, "server", "ai-c
 
 const mailRunner = createMailRunner({ root, dataDir });
 const authConfig = loadAuthConfig();
-const waLink = createWaLink({ root, dataDir });
+const waLink = null;
 const photoIntake = createPhotoIntake({ root, dataDir, ai: aiConfig(), waLink, internacionFile, lab: createLabLookup({ root }) });
 // Clima: se actualiza cada 10 minutos aunque nadie tenga la pantalla abierta, para detectar los cambios de nivel.
-// Cuando el nivel cambia, se intenta el aviso por correo (apagado hasta configurar server/avisos-config.json).
-const weatherWatch = createWeatherWatch({ dataDir, onLevelChange(change) {
-  const child = spawn(process.env.PYTHON_COMMAND || (process.platform === "win32" ? "python" : "python3"), [resolve(root, "scripts", "aviso_nivel.py")], { cwd: root, env: { ...process.env, APP_ROOT: root }, stdio: ["pipe", "ignore", "ignore"], windowsHide: true });
-  child.once("error", () => undefined);
-  child.stdin.end(JSON.stringify(change));
-} });
+// No se ejecutan avisos automáticos al cambiar de nivel.
+const weatherWatch = createWeatherWatch({ dataDir });
 const weatherTimer = setInterval(() => { weatherWatch.refresh().catch(() => undefined); }, 10 * 60_000);
 weatherTimer.unref();
 setTimeout(() => { weatherWatch.refresh().catch(() => undefined); }, 15_000).unref();
@@ -45,11 +41,11 @@ const server = createHospitalServer({ distDir, dataDir, catalogFile, internacion
 photoIntake.start();
 // Prueba de modelos de IA, sólo si se pidió en ai-config.json: corre una vez, en segundo plano, y no cambia lo publicado.
 if (String(process.env.AI_COMPARE ?? "").toLowerCase() === "true") setTimeout(() => { import("./ai-compare.mjs").then((mod) => mod.runComparison({ dataDir, config: aiConfig(), internacionFile })).then((result) => appendAudit(dataDir, { actor: "system", action: "ai_model_comparison", kind: "system", ok: result.ok, repetida: Boolean(result.repetida), motivo: result.motivo ?? null })).catch((error) => appendAudit(dataDir, { actor: "system", action: "ai_model_comparison_failed", kind: "system", error: String(error?.message ?? "error").slice(0, 80) })); }, 45_000).unref();
-waLink.start();
+
 if (aiConfig().enabled) verifyOpenAi(aiConfig()).then((result) => writeJsonAtomic(resolve(dataDir, "ai", "status.json"), { ...result, at: new Date().toISOString() })).catch(() => undefined);
 const stopSchedule = scheduleMailSync(mailRunner);
-const stopWhatsAppDrafts = scheduleWhatsAppDrafts(dataDir, authConfig.secret);
-server.once("close", () => { stopSchedule(); stopWhatsAppDrafts(); photoIntake.stop(); waLink.stop(); });
+const stopWhatsAppDrafts = () => {}; // Sin programación automática de mensajes.
+server.once("close", () => { stopSchedule(); stopWhatsAppDrafts(); photoIntake.stop();  });
 server.listen(port, host, () => {
   process.stdout.write(`Hospital Schestakow listo en http://${host}:${port}\n`);
 });

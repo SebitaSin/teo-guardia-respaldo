@@ -119,7 +119,7 @@ export function analyzeRadar(bytes) {
 }
 
 /**
- * Alertas que salen del radar, cada una con su grado (1 a 9). Reglas revisadas con un especialista en emergencias:
+ * Alertas que salen del radar. Umbrales locales que requieren contraste con eventos reales:
  * SOBRE LA CIUDAD cuenta la superficie de eco fuerte en un radio de 15 km, no el píxel más alto:
  *   20 km² de 45 dBZ o más = tormenta (grado 3) · 4 km² de 54 o más = tormenta fuerte, granizo posible (5).
  *   Los grados altos piden además PERSISTENCIA (se cumple en 2 de los últimos 3 barridos) y cercanía:
@@ -137,26 +137,30 @@ export function radarAlerts(reading, time, steer = null, recent = [reading]) {
   const zero = { km2_45: 0, km2_54: 0, km2_60: 0, km2_60_8km: 0 };
   const city = { ...zero, ...(reading.ciudad ?? {}) };
   const last = recent.slice(0, 3).map((item) => ({ ...zero, ...(item?.ciudad ?? {}) }));
-  const persists = (test) => last.filter(test).length >= 2;
-  if (persists((c) => c.km2_60_8km >= 25)) add(8, "Núcleo de granizo extenso sobre San Rafael", `${city.km2_60_8km} km² con 60 dBZ o más a menos de 8 km del hospital, en dos barridos seguidos`);
-  else if (persists((c) => c.km2_60 >= 10 && c.km2_60_8km > 0)) add(7, "Granizo probable sobre San Rafael", `${city.km2_60} km² con 60 dBZ o más, parte a menos de 8 km del hospital, en dos barridos seguidos`);
-  else if (persists((c) => c.km2_60 >= 6)) add(6, "Tormenta muy fuerte con granizo probable sobre San Rafael", `${city.km2_60} km² con 60 dBZ o más a menos de 15 km, en dos barridos seguidos`);
+  // Los barridos anteriores confirman persistencia; nunca sustituyen un núcleo que ya desapareció.
+  const persists = (test) => test(city) && last.filter(test).length >= 2;
+  if (persists((c) => c.km2_60_8km >= 25)) add(8, "Núcleo de granizo extenso sobre San Rafael", `${city.km2_60_8km} km² con 60 dBZ o más a menos de 8 km del hospital, en dos de los tres últimos barridos, incluido el actual`);
+  else if (persists((c) => c.km2_60 >= 10 && c.km2_60_8km > 0)) add(7, "Granizo probable sobre San Rafael", `${city.km2_60} km² con 60 dBZ o más, parte a menos de 8 km del hospital, en dos de los tres últimos barridos, incluido el actual`);
+  else if (persists((c) => c.km2_60 >= 6)) add(6, "Tormenta muy fuerte con granizo probable sobre San Rafael", `${city.km2_60} km² con 60 dBZ o más a menos de 15 km, en dos de los tres últimos barridos, incluido el actual`);
   else if (city.km2_54 >= 4) add(5, "Tormenta fuerte con posible granizo sobre San Rafael", `${city.km2_54} km² con 54 dBZ o más a menos de 15 km de la ciudad`);
   else if (city.km2_45 >= 20) add(3, "Tormenta sobre San Rafael", `${city.km2_45} km² con 45 dBZ o más a menos de 15 km de la ciudad`);
   const cell = reading.celda;
   if (!alerts.some((alert) => alert.grado >= 5) && cell && cell.km > 15 && cell.km <= 60 && (cell.nucleo_km2 ?? 0) >= 4) {
     const known = steer && Number.isFinite(steer.dir) && Number.isFinite(steer.kmh) && steer.kmh >= 15 && Number.isFinite(cell.grados);
-    const coming = known && Math.abs(((steer.dir - cell.grados + 540) % 360) - 180) <= 50;
+    const angle = known ? Math.abs(((steer.dir - cell.grados + 540) % 360) - 180) : 180;
+    const missKm = cell.km * Math.sin(angle * Math.PI / 180);
+    // Una dirección aproximadamente hacia el este no implica pasar por la ciudad: comprobar el desvío.
+    const coming = known && angle < 90 && missKm <= 15;
     const near = cell.km <= 30, big = cell.dbz >= 60;
-    if (coming) add(near ? (big ? 5 : 4) : (big ? 4 : 3), `Celda con posible granizo a ${cell.km} km al ${cell.rumbo}, viene hacia la ciudad`, `Eco de ${cell.dbz} dBZ, núcleo de ${cell.nucleo_km2} km². El viento en altura la trae a unos ${Math.round(steer.kmh)} km/h (estimado: llegaría en ${Math.max(10, Math.round((cell.km / steer.kmh) * 6) * 10)} minutos)`);
-    else if (!known && near) add(big ? 4 : 3, `Celda con posible granizo a ${cell.km} km al ${cell.rumbo}, casi sin moverse`, `Eco de ${cell.dbz} dBZ, núcleo de ${cell.nucleo_km2} km². Viento en altura flojo o sin dato: puede quedarse descargando en el lugar`);
+    if (coming) add(near ? (big ? 5 : 4) : (big ? 4 : 3), `Celda con posible granizo a ${cell.km} km al ${cell.rumbo}, trayectoria estimada hacia San Rafael`, `Eco de ${cell.dbz} dBZ, núcleo de ${cell.nucleo_km2} km². Estimación por viento en altura de ${Math.round(steer.kmh)} km/h; no es movimiento medido de la celda`);
+    else if (!known && near) alerts.push({ tipo: "radar", grado: 2, nivel: "verde", alcance: "REGIONAL", afecta_ciudad: false, titulo: `Celda a ${cell.km} km al ${cell.rumbo}, sin trayectoria confirmada hacia San Rafael`, detalle: `Eco de ${cell.dbz} dBZ, núcleo de ${cell.nucleo_km2} km². El viento en altura no permite estimar si afectará a la ciudad`, desde: time, hasta: time });
   }
   // Celda que no se va: núcleo fuerte a 45 km o menos presente en tres barridos seguidos sin acercarse. Es la que
   // descarga en un mismo lugar (aluvión aguas arriba), aunque en la ciudad no llueva. Regla provisoria.
   const cells = recent.slice(0, 3).map((item) => item?.celda).filter((item) => item && (item.nucleo_km2 ?? 0) >= 4 && item.km > 15 && item.km <= 45);
   if (cells.length === 3 && Math.abs(cells[0].km - cells[2].km) <= 5 && !alerts.some((alert) => alert.grado >= 5)) {
-    const stuck = { tipo: "radar", sostenida: true, grado: 3, nivel: "amarillo", titulo: `Lluvia sostenida a ${cells[0].km} km al ${cells[0].rumbo}: celda fuerte que no se mueve`, detalle: `Núcleo de ${cells[0].dbz} dBZ en el mismo lugar durante tres barridos seguidos: riesgo de aluvión en esa zona`, desde: time, hasta: time };
-    return [...alerts.filter((alert) => / sobre San Rafael/.test(alert.titulo)), stuck];
+    const stuck = { tipo: "radar", sostenida: true, grado: 2, nivel: "verde", alcance: "REGIONAL", afecta_ciudad: false, titulo: `Eco persistente a ${cells[0].km} km al ${cells[0].rumbo}`, detalle: `Núcleo de ${cells[0].dbz} dBZ a distancia similar durante tres barridos. Sin evidencia de desplazamiento ni vínculo hidrológico comprobado con la ciudad; no confirma un aluvión`, desde: time, hasta: time };
+    return [...alerts.filter((alert) => alert.afecta_ciudad !== false), stuck];
   }
   return alerts;
 }

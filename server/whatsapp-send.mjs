@@ -2,6 +2,7 @@ import { createCipheriv, createDecipheriv, createHash, randomBytes, randomUUID }
 import { existsSync, mkdirSync, readFileSync, renameSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { readJson } from "./store.mjs";
+import { requireConsent } from "./whatsapp-consent.mjs";
 import { whatsappCanSend, whatsappReady } from "./whatsapp.mjs";
 
 // Etapa 6 — Mensajes salientes.
@@ -88,8 +89,9 @@ export function serviceWindowStatus(dataDir, phone, now = Date.now()) {
   let latest = 0;
   for (const item of inbox) {
     if (normalizeArgentinePhone(item?.remitente) !== target) continue;
-    const at = Date.parse(item?.recibido_en ?? "");
-    if (Number.isFinite(at) && at > latest) latest = at;
+    if (item?.source !== "WHATSAPP_CLOUD_API") continue;
+    const at = Date.parse(item?.mensaje_en ?? "");
+    if (Number.isFinite(at) && at <= now && at > latest) latest = at;
   }
   if (!latest) return { open: false, lastInboundAt: null, expiresAt: null };
   const expiresAt = latest + SERVICE_WINDOW_MS;
@@ -227,17 +229,18 @@ function buildPayload(record) {
 // Envío real
 // ---------------------------------------------------------------------------
 
-export async function deliverOutbound({ dataDir, secret, id, config, fetchImpl = fetch, now = Date.now() }) {
+async function deliverUnlocked({ dataDir, secret, id, config, fetchImpl = fetch, now = Date.now() }) {
   if (!whatsappCanSend(config)) throw new Error("whatsapp_not_configured");
   const state = readOutboxState(dataDir, secret);
   const record = state.records.find((item) => item.id === id);
   if (!record) throw new Error("outbound_not_found");
   if (record.estado !== "APROBADO") throw new Error("outbound_not_approved");
 
+  requireConsent(dataDir, secret, record.to);
   if (record.kind === "text") {
     const window = serviceWindowStatus(dataDir, record.to, now);
     // Sin webhook de recepción la app no puede conocer la ventana de 24 h: decide Meta (error 131047).
-    if (!window.open && whatsappReady(config)) {
+    if (!window.open) {
       record.estado = "FALLIDO";
       record.error = "service_window_closed";
       record.fallado_en = new Date(now).toISOString();
@@ -249,6 +252,8 @@ export async function deliverOutbound({ dataDir, secret, id, config, fetchImpl =
 
   assertSendBudget(state.records, record, now);
   record.intentos += 1;
+  record.estado = "ENVIANDO";
+  writeOutboxState(dataDir, secret, state);
 
   let response;
   try {
@@ -260,9 +265,9 @@ export async function deliverOutbound({ dataDir, secret, id, config, fetchImpl =
     });
   } catch (error) {
     record.estado = "FALLIDO";
-    record.error = error instanceof Error ? error.message.slice(0, 120) : "network_error";
+    record.error = "network_result_unknown";
     record.fallado_en = new Date(now).toISOString();
-    writeOutboxState(dataDir, secret, state);
+    writeOutboxState(dataDir, secret, { records: readOutboxState(dataDir, secret).records.map(item => item.id === id ? record : item) });
     throw error;
   }
 
@@ -287,16 +292,23 @@ export async function deliverOutbound({ dataDir, secret, id, config, fetchImpl =
     record.error = String(result?.error?.message ?? `http_${response.status}`).slice(0, 240);
     record.error_code = Number(result?.error?.code ?? response.status);
     record.fallado_en = new Date(now).toISOString();
-    writeOutboxState(dataDir, secret, state);
+    writeOutboxState(dataDir, secret, { records: readOutboxState(dataDir, secret).records.map(item => item.id === id ? record : item) });
     throw new Error(`whatsapp_send_${record.error_code}`);
   }
 
+  if (!result?.messages?.[0]?.id) {
+    record.estado = "FALLIDO"; record.error = "missing_message_id";
+    const latest = readOutboxState(dataDir, secret);
+    latest.records = latest.records.map(item => item.id === id ? record : item);
+    writeOutboxState(dataDir, secret, latest);
+    throw new Error("whatsapp_send_502");
+  }
   record.estado = "ENVIADO";
   record.wamid = String(result?.messages?.[0]?.id ?? "").slice(0, 200);
   record.enviado_en = new Date(now).toISOString();
   delete record.error;
   delete record.error_code;
-  writeOutboxState(dataDir, secret, state);
+  writeOutboxState(dataDir, secret, { records: readOutboxState(dataDir, secret).records.map(item => item.id === id ? record : item) });
   return record;
 }
 
@@ -385,7 +397,7 @@ export function deliverManual(dataDir, secret, id, actor, now = Date.now()) {
 
   assertSendBudget(state.records, record, now);
   const link = waMeLink(record.to, record.body);
-  record.estado = "ENVIADO";
+  record.estado = "ENLACE_ABIERTO";
   record.canal = "MANUAL";
   record.enviado_en = new Date(now).toISOString();
   record.enviado_por = who;
@@ -400,4 +412,13 @@ export function manualBatchLinks(dataDir, secret) {
   return readOutboxState(dataDir, secret)
     .records.filter((item) => item.estado === "APROBADO" && item.kind === "text")
     .map((item) => ({ id: item.id, to: item.to, motivo: item.motivo, link: waMeLink(item.to, item.body) }));
+}
+
+// Una sola operación de red por almacén; evita doble clic y pérdida de registros.
+const deliveryLocks = new Set();
+export async function deliverOutbound(options) {
+  if (deliveryLocks.has(options.dataDir)) throw new Error("send_in_progress");
+  deliveryLocks.add(options.dataDir);
+  try { return await deliverUnlocked(options); }
+  finally { deliveryLocks.delete(options.dataDir); }
 }

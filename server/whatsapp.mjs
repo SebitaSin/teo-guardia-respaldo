@@ -13,6 +13,7 @@ export function whatsappConfig(env = process.env) {
     groupId: String(env.WHATSAPP_GROUP_ID ?? ""),
     graphVersion: String(env.WHATSAPP_GRAPH_VERSION ?? ""),
     publicNumber: String(env.WHATSAPP_PUBLIC_NUMBER ?? ""),
+    businessAccountId: String(env.WHATSAPP_BUSINESS_ACCOUNT_ID ?? ""),
   };
 }
 
@@ -79,6 +80,7 @@ export async function receiveWhatsApp({ raw, signature, dataDir, config, fetchIm
   const known = new Set(inbox.map((item) => item.mensaje_id));
   for (const entry of payload.entry ?? []) {
     for (const change of entry.changes ?? []) {
+      if (change.value?.metadata?.phone_number_id && String(change.value.metadata.phone_number_id) !== String(config.phoneNumberId)) continue;
       for (const msg of change.value?.messages ?? []) {
         if (!msg?.id || known.has(msg.id) || !["image", "text"].includes(msg.type)) continue;
         if (config.groupId && msg.group_id !== config.groupId) continue;
@@ -91,6 +93,8 @@ export async function receiveWhatsApp({ raw, signature, dataDir, config, fetchIm
             grupo: msg.group_id ? String(msg.group_id).slice(0, 200) : "1:1",
             remitente: String(msg.from ?? "UNKNOWN").slice(0, 80),
             recibido_en: new Date().toISOString(),
+            source: "WHATSAPP_CLOUD_API",
+            mensaje_en: Number.isFinite(Number(msg.timestamp)) && Number(msg.timestamp) > 0 && Number(msg.timestamp) * 1000 <= Date.now() + 60_000 ? new Date(Number(msg.timestamp) * 1000).toISOString() : null,
             tipo: msg.type,
             texto: text,
             categoria: classification.category,

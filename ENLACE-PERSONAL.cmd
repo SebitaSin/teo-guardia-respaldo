@@ -17,5 +17,5 @@ if /i not "%CF%"=="cloudflared" if not exist "%CF%" (
 )
 echo.
 echo   Abriendo el enlace... ^(tarda unos segundos^)
-node scripts\enlace-personal.mjs "%CF%"
+powershell.exe -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\iniciar-enlace-personal.ps1" -Hours 24 -Cloudflared "%CF%"
 pause

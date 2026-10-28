@@ -33,8 +33,8 @@ function readJson<T>(key: string, fallback: T): T {
 
 function writeJson(key: string, value: unknown): Ok | Err {
   try {
-    storageSet(key, JSON.stringify(value));
-    return { ok: true };
+    const saved = storageSet(key, JSON.stringify(value));
+    return saved ? { ok: true } : { ok: false, error: "Sin almacenamiento persistente; datos sólo en memoria" };
   } catch (e) {
     return { ok: false, error: e instanceof Error ? e.message : "storage" };
   }

@@ -1,0 +1,16 @@
+REVISION DE LA OTRA COMPUTADORA
+
+1. Extrae el ZIP y copia la carpeta a la computadora que queres usar.
+2. Hace doble clic en REVISAR-EQUIPO.cmd.
+3. Busca REVISION-EQUIPO-GUARDIA.txt en el Escritorio y comparti su contenido.
+
+Los archivos REVISAR-EQUIPO.cmd y REVISAR-EQUIPO.ps1 deben quedar juntos.
+La revision solo consulta Windows, procesador, RAM y espacio libre.
+No necesita internet. No instala nada ni cambia la configuracion.
+No lee pacientes, personal, claves ni documentos.
+
+Si ese Windows no tiene PowerShell, la ventana te indicara como ver los datos
+desde Equipo o Mi PC > Propiedades, sin instalar programas.
+
+El informe permite elegir el siguiente paso. No certifica salud del disco,
+estabilidad, compatibilidad con un sistema nuevo ni capacidad de servidor.

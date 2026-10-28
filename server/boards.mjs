@@ -6,10 +6,15 @@ import { join } from "node:path";
 import { readJson, writeJsonAtomic } from "./store.mjs";
 import { bedKey, matchTemplate } from "./board-templates.mjs";
 import { labForService, textSimilarity, verifyBoardRows } from "./board-verification.mjs";
+import { applyBedCapacity, ucoBedKey } from "../src/data/bed-capacity.mjs";
 
 const currentPath = (dataDir) => join(dataDir, "boards", "current.json");
 const processedPath = (dataDir) => join(dataDir, "boards", "processed.json");
-export function readBoards(dataDir) { return readJson(currentPath(dataDir), { services: {} }); }
+export function readBoards(dataDir) {
+  const boards = readJson(currentPath(dataDir), { services: {} });
+  if (boards.services.uco) boards.services.uco.beds = applyBedCapacity(boards.services.uco.beds ?? [], "uco");
+  return boards;
+}
 export function processedCaptures(dataDir) { return readJson(processedPath(dataDir), {}); }
 
 function fold(value) { return String(value ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toUpperCase().replace(/[^A-Z0-9]+/g, " ").trim(); }
@@ -20,7 +25,7 @@ const text = (value, max) => { const clean = String(value ?? "").trim().slice(0,
 function catalogBeds(internacionFile) {
   try {
     const beds = JSON.parse(readFileSync(internacionFile, "utf8")).beds ?? [];
-    return beds.filter((bed) => bed.estado !== "NO_ASISTENCIAL").map((bed) => ({ slug: bed.slug, servicio: bed.servicio, cama: String(bed.cama) }));
+    return applyBedCapacity(beds).filter((bed) => bed.estado !== "NO_ASISTENCIAL").map((bed) => ({ slug: bed.slug, servicio: bed.servicio, cama: String(bed.cama) }));
   } catch { return []; }
 }
 
@@ -115,6 +120,13 @@ export function publishReading({ dataDir, internacionFile, capture, reading, ext
   const catalog = catalogBeds(internacionFile);
   const found = identifyService({ rows, texto: capture.texto, catalog, boards: readBoards(dataDir), sender: senderHistory(dataDir, capture.remitente) });
   if (!found.slug) return mark(dataDir, capture.hash, { estado: "NO_PUBLICADA", motivo: found.motivo });
+  if (found.slug === "uco") {
+    const keys = rows.map((row) => ucoBedKey(row.bed));
+    if (keys.some((key) => !key) || new Set(keys).size !== keys.length) {
+      return mark(dataDir, capture.hash, { estado: "NO_PUBLICADA", slug: "uco", servicio: "UCO", motivo: "UCO tiene un máximo de 6 camas (1 a 6); la lectura contiene camas fuera de rango o repetidas" });
+    }
+  }
+  const keyFor = (value) => found.slug === "uco" ? ucoBedKey(value) : bedKey(value);
   const serviceBeds = catalog.filter((bed) => bed.slug === found.slug);
   const servicio = serviceBeds[0]?.servicio ?? matchTemplate(capture.texto)?.servicio ?? found.slug;
   const fotoFecha = capture.foto_fecha ?? capture.recibido_en;
@@ -124,18 +136,18 @@ export function publishReading({ dataDir, internacionFile, capture, reading, ext
   if (previous && Date.parse(fotoFecha) < Date.parse(previous.foto_fecha)) {
     return mark(dataDir, capture.hash, { estado: "NO_PUBLICADA", slug: found.slug, servicio, motivo: "ya hay una pizarra más nueva de ese servicio; esta queda como antecedente" });
   }
-  const verified = verifyBoardRows({ rows: rows.map((row) => ({ ...row, service: servicio })), dataDir, internacionFile, usePart: false, extraLab, serviceLab: recentLab ? labForService(recentLab, found.slug, labMap, labBeds) : null }).rows;
-  const previousBeds = new Map((previous?.beds ?? []).map((bed) => [bedKey(bed.cama), bed]));
+  const verified = verifyBoardRows({ rows: rows.map((row) => ({ ...row, service: servicio, bed: found.slug === "uco" ? serviceBeds.find((bed) => keyFor(bed.cama) === keyFor(row.bed))?.cama ?? row.bed : row.bed })), dataDir, internacionFile, usePart: false, extraLab, serviceLab: recentLab ? labForService(recentLab, found.slug, labMap, labBeds) : null }).rows;
+  const previousBeds = new Map((previous?.beds ?? []).map((bed) => [keyFor(bed.cama), bed]));
   const seen = new Map();
   const extras = [];
   for (const row of verified) {
-    const key = bedKey(row.bed);
-    const known = serviceBeds.find((bed) => bedKey(bed.cama) === key);
+    const key = keyFor(row.bed);
+    const known = serviceBeds.find((bed) => keyFor(bed.cama) === key);
     const old = previousBeds.get(key);
     const occupied = Boolean(row.patient || row.diagnosis || digits(row.dni));
     let bed;
     if (old?.revision === "CONFIRMADA" && (occupied ? samePatient(old, row) : old.estado === "LIBRE")) {
-      bed = { ...old, visto: true }; // misma persona en la misma cama: la confirmación sigue valiendo
+      bed = { ...old, cama: known?.cama ?? old.cama, visto: true }; // misma persona en la misma cama: la confirmación sigue valiendo
     } else {
       const reasons = (row.verification?.reasons ?? []).filter((reason) => known || reason !== "cama no encontrada en el parte actual");
       if (!key) reasons.push("cama no legible"); else if (!known) reasons.push("cama que no figura en el catálogo del servicio");
@@ -157,7 +169,7 @@ export function publishReading({ dataDir, internacionFile, capture, reading, ext
   }
   // Camas del servicio que la foto no muestra: no se borra a nadie por lo que no se ve.
   const beds = serviceBeds.map((known) => {
-    const key = bedKey(known.cama);
+    const key = keyFor(known.cama);
     if (seen.has(key)) return seen.get(key);
     const old = previousBeds.get(key);
     return old ? { ...old, visto: false } : { cama: known.cama, estado: "DESCONOCIDA", paciente: null, revision: null, motivos: [], visto: false };

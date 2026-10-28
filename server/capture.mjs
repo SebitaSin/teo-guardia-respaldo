@@ -58,7 +58,13 @@ function publicItem(item) {
 }
 
 /** Capturas guardadas, con la ruta de la imagen (uso interno del servidor). */
-export function storedCaptures(dataDir) { return readJson(inboxPath(dataDir), []); }
+export function storedCaptures(dataDir) {
+  const manual = readJson(inboxPath(dataDir), []);
+  const official = readJson(join(dataDir, "whatsapp", "inbox.json"), [])
+    .filter(item => item.tipo === "image" && item.source === "WHATSAPP_CLOUD_API" && item.mensaje_en)
+    .map(item => ({ ...item, captura_id: item.mensaje_id, fuente: "WHATSAPP_API", foto_fecha: item.mensaje_en, turno: null, turno_origen: "DESCONOCIDO", servicio: item.texto ? matchTemplate(item.texto)?.servicio ?? null : null }));
+  return [...manual, ...official];
+}
 
 export function captureInbox(dataDir) {
   const published = readJson(join(dataDir, "boards", "processed.json"), {});

@@ -351,6 +351,17 @@ def sync(factory=imaplib.IMAP4_SSL) -> dict:
     return stats
 
 
+def run_schedule_requests(stats: dict, runner=None) -> dict:
+    """Sólo reclama después de comprobar el correo y leer el catálogo de este ciclo."""
+    catalog = stats.get("catalog")
+    if stats.get("status") != "complete" or not isinstance(catalog, dict) or "read" not in catalog or catalog.get("status") == "failed":
+        return {"enabled": False, "reason": "correo_o_catalogo_sin_actualizar"}
+    if runner is None:
+        import reclamos
+        runner = reclamos.run
+    return runner()
+
+
 def main() -> int:
     DATA_ROOT.mkdir(parents=True, exist_ok=True)
     try:
@@ -368,8 +379,7 @@ def main() -> int:
         record_error("catalog_ingest_failed", exc)
     # Reclamo de planillas que faltan. Sólo envía si está habilitado en server/reclamos-config.json.
     try:
-        import reclamos
-        stats["reclamos"] = reclamos.run()
+        stats["reclamos"] = run_schedule_requests(stats)
     except Exception as exc:
         record_error("reclamos_failed", exc)
     stats.update({"at": now(), "account": ACCOUNT, "readonly": True})

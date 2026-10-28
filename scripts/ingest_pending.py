@@ -21,12 +21,13 @@ from datetime import date, datetime, timedelta
 from email.utils import parsedate_to_datetime
 from pathlib import Path
 from xml.etree import ElementTree as ET
+from schedule_services import ServiceIndex
 
 APP_ROOT = Path(os.environ.get("APP_ROOT", Path(__file__).resolve().parents[1])).resolve()
 DATA_DIR = Path(os.environ.get("APP_DATA_DIR", APP_ROOT / "var")).resolve()
 MAIL_DIR = DATA_DIR / "mail"
 OUT_DIR = Path(os.environ.get("APP_CATALOG_DIR", DATA_DIR / "catalog")).resolve()
-PARSER_VERSION = 4
+PARSER_VERSION = 5
 # Lo que no se pudo leer y llegó antes de esta fecha es historia: no se procesa ni se lista como pendiente.
 # Todo lo que llega desde esta fecha se procesa siempre.
 BACKLOG_BEFORE = date(2026, 9, 21)
@@ -701,6 +702,9 @@ def read_attachment(path: Path, item: dict) -> dict:
         raise
 
     top_text = " ".join(" ".join(row) for table in tables for row in table[:4])
+    # Reconocer el servicio no exige que ya se haya entendido el calendario.
+    # Estas pistas no se publican como guardias.
+    person_hints = [cell[:160] for table in tables for row in table for cell in row if cell.strip()][:300]
     hint = " ".join([item.get("filename") or "", item.get("subject") or "", " ".join(titles), top_text])
     notes: list[str] = []
     entries: list[Entry] = []
@@ -740,7 +744,7 @@ def read_attachment(path: Path, item: dict) -> dict:
         if dated:
             layout = "fechas"
     if not entries and not ranges and not dated:
-        return {"reason": "no se reconoció una tabla de guardias"}
+        return {"reason": "no se reconoció una tabla de guardias", "personHints": person_hints}
 
     if dated:
         hint_month, hint_year = explicit_month(hint)
@@ -754,7 +758,7 @@ def read_attachment(path: Path, item: dict) -> dict:
     else:
         year, month, problem = resolve_month(entries, hint, mail_day(item))
     if problem:
-        return {"reason": problem}
+        return {"reason": problem, "personHints": person_hints}
     days_in = calendar.monthrange(year, month)[1]
     by_day: dict[int, list[str]] = {}
     if ranges:
@@ -774,10 +778,10 @@ def read_attachment(path: Path, item: dict) -> dict:
             target = by_day.setdefault(day, [])
             target.extend(line for line in lines if line not in target)
     if not by_day and not dated:
-        return {"reason": "la tabla no tiene días del mes indicado"}
+        return {"reason": "la tabla no tiene días del mes indicado", "personHints": person_hints}
     seen_days = [day for day, _, _ in entries]
     if len(seen_days) != len(set(seen_days)) and layout == "grilla":
-        return {"reason": "hay días repetidos en la grilla"}
+        return {"reason": "hay días repetidos en la grilla", "personHints": person_hints}
 
     department = detect_department(" ".join([item.get("filename") or "", " ".join(titles), top_text])) \
         or detect_department(item.get("subject") or "") \
@@ -836,7 +840,35 @@ def read_xls(path: Path) -> tuple[list[str], list[list[list[str]]]]:
     return names, tables
 
 
-def scanned_pdf_images(path: Path, max_pages: int = 2) -> list[bytes]:
+def embedded_jpegs(resources, seen=None) -> list[bytes]:
+    """JPEG originales del PDF: no necesitan Pillow ni recodificación."""
+    seen = set() if seen is None else seen
+    if not resources:
+        return []
+    resources = resources.get_object()
+    objects = resources.get("/XObject")
+    if not objects:
+        return []
+    found = []
+    for reference in objects.get_object().values():
+        obj = reference.get_object()
+        if id(obj) in seen:
+            continue
+        seen.add(id(obj))
+        if obj.get("/Subtype") == "/Form":
+            found.extend(embedded_jpegs(obj.get("/Resources"), seen))
+        elif obj.get("/Subtype") == "/Image":
+            filters = obj.get("/Filter") or []
+            if isinstance(filters, str):
+                filters = [filters]
+            if "/DCTDecode" in filters:
+                data = obj.get_data()
+                if data.startswith(b"\xff\xd8\xff"):
+                    found.append(data)
+    return found
+
+
+def scanned_pdf_images(path: Path, max_pages: int = 2, *, allow_embedded: bool = False) -> list[bytes]:
     """Imagen más grande de cada una de las primeras páginas de un PDF escaneado (JPEG o PNG)."""
     vendor = str(Path(__file__).resolve().parent / "vendor")
     if vendor not in sys.path:
@@ -851,7 +883,10 @@ def scanned_pdf_images(path: Path, max_pages: int = 2) -> list[bytes]:
                 if (data[:3] == b"\xff\xd8\xff" or data.startswith(b"\x89PNG")) and len(data) > len(best):
                     best = data
         except Exception:
-            continue
+            # pypdf.page.images exige Pillow aun si el PDF ya contiene un JPEG.
+            # Mantener el archivo original permite leer estos escaneos en la PC.
+            if allow_embedded:
+                best = max(embedded_jpegs(page.get("/Resources")), key=len, default=b"")
         if len(best) > 20_000:
             found.append(best)
     return found
@@ -862,8 +897,19 @@ def read_scanned_pdf(path: Path, item: dict) -> dict:
     reason = {"reason": "pdf escaneado o con formato no reconocido"}
     if (mail_day(item) or date.today()) < BACKLOG_BEFORE:
         return reason
+    subject = fold(item.get("subject") or "")
+    if re.search(r"\b(BECAS?|CURSO|CONGRESO|FACTURA|PRESUPUESTO|INVITACION)\b", subject) and not re.search(r"\b(GUARDIAS?|CRONOGRAMA|PLANILLA)\b", subject):
+        return {"reason": "pdf: el correo no corresponde a un cronograma de guardias"}
+    # La nueva vía de extracción sólo se activa para el adjunto autorizado.
+    # La revisión automática pidió autorización directa para este envío a OpenAI.
     try:
-        images = scanned_pdf_images(path)
+        approved = json.loads((DATA_DIR / "ai" / "schedule-pdf-approvals.json").read_text("utf-8")).get("attachments", [])
+    except (OSError, ValueError):
+        approved = []
+    if not item.get("sha256") or item["sha256"] not in approved:
+        return {"reason": "pdf escaneado: pendiente de autorización para lectura con OpenAI"}
+    try:
+        images = scanned_pdf_images(path, allow_embedded=True)
     except Exception:
         return reason
     last = reason
@@ -913,69 +959,55 @@ def name_tokens(doc: dict) -> set[str]:
     return words - {"REEMPLAZO", "REFUERZO", "GUARDIA", "PASIVA", "ACTIVA", "NOCHE", "TARDE", "MANANA"}
 
 
-def resolve_departments(documents: list[dict]) -> None:
-    """Si el archivo no nombra el servicio: primero el remitente habitual, después las personas."""
-    by_sender: dict[str, dict[str, int]] = {}
-    by_department: dict[str, set[str]] = {}
-    known = [d for d in documents if d["departments"]]
+def service_index(documents: list[dict]) -> ServiceIndex:
+    """Referencias explícitas y nómina; nunca aprende de su propia inferencia."""
     try:
         bundled = json.loads((APP_ROOT / "src" / "data" / "catalog.json").read_text("utf-8")).get("documents", [])
     except Exception:
         bundled = []
-    for doc in known:
-        sender = doc["source"].get("sender")
-        if sender:
-            counts = by_sender.setdefault(sender, {})
-            counts[doc["departments"][0]] = counts.get(doc["departments"][0], 0) + 1
-    # Las fotos no sirven de referencia para reconocer a otras planillas por sus nombres.
-    for doc in [d for d in known if "foto" not in d["flags"]] + [d for d in bundled if d.get("departments") and d.get("shifts")]:
-        by_department.setdefault(doc["departments"][0], set()).update(name_tokens(doc))
+    try:
+        staff = json.loads((APP_ROOT / "src" / "data" / "staff.json").read_text("utf-8"))
+    except Exception:
+        staff = {}
+    try:
+        owners = json.loads((MAIL_DIR / "reclamos-control.json").read_text("utf-8")).get("recipients", {})
+    except Exception:
+        owners = {}
+    current = {doc.get("id") for doc in documents}
+    return ServiceIndex(documents + [doc for doc in bundled if doc.get("id") not in current], staff, owners)
+
+
+def resolve_departments(documents: list[dict], index: ServiceIndex | None = None) -> None:
+    """Cruza médicos distintos con remitentes de meses anteriores y responsables."""
+    index = index or service_index(documents)
     for doc in documents:
         if doc["departments"]:
             continue
-        counts = by_sender.get(doc["source"].get("sender") or "", {})
-        total = sum(counts.values())
-        best = max(counts, key=counts.get) if counts else None
-        if best and counts[best] / total >= 0.8:
-            doc["departments"] = [best]
-            doc["source"]["departmentBy"] = "remitente"
-            continue
-        mine = name_tokens(doc)
-        scored = sorted(((len(mine & names) / len(mine), slug) for slug, names in by_department.items()), reverse=True) if mine else []
-        if scored and scored[0][0] >= 0.6 and (len(scored) == 1 or scored[0][0] - scored[1][0] >= 0.25):
-            doc["departments"] = [scored[0][1]]
-            doc["source"]["departmentBy"] = "personas"
+        evidence = index.identify(doc)
+        doc.setdefault("source", {})["serviceEvidence"] = evidence
+        if evidence["slug"]:
+            doc["departments"] = [evidence["slug"]]
+            doc["source"]["departmentBy"] = evidence["method"]
 
 
-def resolve_unread(unread: list[dict], documents: list[dict], pending: list[dict]) -> None:
-    """Archivo que no se pudo leer y no nombra el servicio: se asigna por quien lo manda.
-
-    Primero el servicio del que ese remitente manda siempre; si no hay historia, lo que diga
-    su dirección o el asunto. Si nada alcanza, queda sin servicio: no se inventa.
-    """
+def resolve_unread(unread: list[dict], documents: list[dict], pending: list[dict], index: ServiceIndex | None = None) -> None:
+    """El servicio puede identificarse aunque las fechas o el formato sigan sin leer."""
+    index = index or service_index(documents)
     item_of = {item.get("id"): item for item in pending}
-    by_sender: dict[str, dict[str, int]] = {}
-    def count(sender: str, slug: str) -> None:
-        if sender:
-            by_sender.setdefault(sender, {})[slug] = by_sender.setdefault(sender, {}).get(slug, 0) + 1
-    for doc in documents:
-        if doc["departments"]:
-            count(sender_address(doc["source"].get("sender") or ""), doc["departments"][0])
-    for entry in unread:
-        if entry["departments"]:
-            count(sender_address((item_of.get(entry["id"]) or {}).get("from") or ""), entry["departments"][0])
     for entry in unread:
         if entry["departments"]:
             continue
         item = item_of.get(entry["id"]) or {}
-        counts = by_sender.get(sender_address(item.get("from") or ""), {})
-        best = max(counts, key=counts.get) if counts else None
-        if best and counts[best] / sum(counts.values()) >= 0.8:
-            entry["departments"], entry["departmentBy"] = [best], "remitente"
-            continue
-        guess = detect_department(" ".join([item.get("subject") or "", item.get("from") or ""]))
-        if guess:
-            entry["departments"], entry["departmentBy"] = [guess], "dirección del remitente"
+        source = {**entry.get("source", {}), "sender": sender_address(item.get("from") or "") or entry.get("source", {}).get("sender", "")}
+        context = [detect_department(text) for text in [item.get("subject") or "", item.get("from") or ""] + (item.get("labels") or [])]
+        evidence = index.identify({**entry, "source": source}, [slug for slug in context if slug])
+        entry["serviceEvidence"] = evidence
+        if "source" in entry:
+            entry["source"]["serviceEvidence"] = evidence
+        if evidence["slug"]:
+            entry["departments"], entry["departmentBy"] = [evidence["slug"]], evidence["method"]
+            if "source" in entry:
+                entry["source"]["departmentBy"] = evidence["method"]
 
 
 PHOTO_MAX_UNCLEAR = 0.4  # después de comparar con planillas anteriores: más que esto no se publica
@@ -1197,22 +1229,20 @@ def run() -> dict:
         if "doc" in result:
             documents.append(result["doc"])
         else:
-            unread.append({**info, "reason": result["reason"]})
-    resolve_departments(documents)
-    # Planilla leída que no nombra el servicio y sin historia de lectura (típico de una foto): se asigna por quien la manda.
-    orphans = [{"id": doc["id"], "departments": []} for doc in documents if not doc["departments"]]
-    resolve_unread(orphans + unread, documents, pending)
-    assigned = {entry["id"]: entry for entry in orphans if entry["departments"]}
-    for doc in documents:
-        if doc["id"] in assigned:
-            doc["departments"] = assigned[doc["id"]]["departments"]
-            doc["source"]["departmentBy"] = assigned[doc["id"]]["departmentBy"]
+            unread.append({**info, "reason": result["reason"], "personHints": result.get("personHints", [])})
+    index = service_index(documents)
+    resolve_departments(documents, index)
+    # La misma evidencia se conserva en la segunda pasada: no se pierde una contradicción.
+    orphans = [doc for doc in documents if not doc["departments"]]
+    resolve_unread(orphans + unread, documents, pending, index)
+    for entry in documents + unread:
+        entry.pop("personHints", None)
     finalize_photos(documents, unread, pending)
     check_photo_names(documents, unread)
     for doc in [d for d in documents if not d["departments"]]:
         documents.remove(doc)
         unread.append({"id": doc["id"], "filename": doc["filename"], "mailDate": doc["source"]["mailDate"], "departments": [],
-                       "reason": "no se pudo determinar el servicio"})
+                       "reason": "no se pudo determinar el servicio", "serviceEvidence": doc.get("source", {}).get("serviceEvidence")})
     # Si el mismo cronograma llega más de una vez, vale el correo más nuevo.
     documents.sort(key=lambda d: d["source"]["mailDate"], reverse=True)
     typed = [doc for doc in documents if "foto" not in doc["flags"]]
