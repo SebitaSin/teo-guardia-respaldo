@@ -23,7 +23,7 @@ for (const entry of readdirSync(join(root, 'server'), { withFileTypes: true })) 
 for (const name of ['autogestion-client.js', 'autogestion-page.html', 'board-templates.json', 'lab-services.json']) copy('server/' + name);
 for (const name of ['imap_sync', 'ingest_pending', 'pdfgrid', 'photo_reader', 'schedule_services', 'reclamos']) copy(`scripts/${name}.py`);
 copy('scripts/vendor');
-for (const name of ['bed-capacity.mjs', 'departments.ts']) copy('src/data/' + name);
+for (const name of ['bed-capacity.mjs', 'departments.ts', 'service-labels.json']) copy('src/data/' + name);
 for (const name of ['Dockerfile', 'render.yaml', 'render-entrypoint.mjs', 'LEEME.md']) copy('deploy/render/' + name, name);
 writeFileSync(join(output, 'package.json'), JSON.stringify({name:'guardia-schestakow-runtime',private:true,type:'module',scripts:{start:'node render-entrypoint.mjs'}},null,2)+'\n');
 writeFileSync(join(output, '.dockerignore'), '.git\n*.log\nMANIFEST.json\nLEEME.md\n');

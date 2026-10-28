@@ -158,6 +158,14 @@ Sin empezar. Dependen de nómina con teléfonos y domicilios confirmados, de la 
 
 ## Registro de cambios
 
+### 2026-10-28 — Render: falta `service-labels.json` en el paquete
+- Responde a: publicar Guardia en un servidor de internet con dominio (OBJETIVO.md).
+- Qué: `deploy/render/prepare-package.mjs` copiaba de `src/data/` sólo `bed-capacity.mjs` y `departments.ts`. `server/staff-groups.mjs` lee `../src/data/service-labels.json` al importarse, así que el contenedor moría con `ENOENT: /app/src/data/service-labels.json` y el deploy salía con estado 1.
+- Cambio: se agrega `service-labels.json` a esa lista. Un archivo de 155 etiquetas de servicio, sin datos de pacientes ni personal.
+- Comprobado fuera de la PC real: el archivo es JSON válido y no lo alcanza el filtro de privados del empaquetador.
+- Sin probar todavía: el arranque completo en `GUARDIA_MODE=produccion` sobre Render.
+
+
 - 2026-10-26 · Punto 4 · Codex. **Invitación integrada para WhatsApp:** por indicación expresa de Sebastián se agregó HOSPITAL SCHESTAKOW a la tarjeta con el mapa, 22%, tiempo aproximado de un minuto y URL completa. Imagen revisada y guardada en `outputs/invitacion-whatsapp-hospital-schestakow.png`; las versiones anteriores se conservan. Material preparado, sin envío a empleados ni cambios en la app. Respaldo de este registro en `_backups/2026-10-26-invitacion-datos/ESTADO-antes-hospital.md`.
 
 - 2026-10-26 · Punto 4 · Codex. **Invitación simplificada por corrección de Sebastián:** se reemplaza como propuesta la estética de pancarta por una tarjeta blanca con el mapa, "Solo el 22% completó sus datos", "Te lleva menos de un minuto" y el enlace completo. Sin lema ni cantidades adicionales. Archivo nuevo `outputs/invitacion-datos-personal-simple-2026-10-26.png`, generado con Imagegen y revisado visualmente; se conserva la versión anterior. No se enviaron mensajes ni se modificó el formulario. Respaldo de este estado en `_backups/2026-10-26-invitacion-datos/ESTADO-antes-simple.md`.
