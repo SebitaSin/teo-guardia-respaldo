@@ -4,7 +4,8 @@ import { appendAudit, readJson, writeJsonAtomic } from "./store.mjs";
 import { verifyOpenAi } from "./ai.mjs";
 // WhatsApp: Cloud API oficial para envios. El receptor vinculado se mantiene
 // encendido porque es el unico camino que recibe las pizarras de los grupos.
-import { createWaLink } from "./wa-link/supervisor.mjs";
+// Se carga a demanda: el paquete de Render no incluye server/wa-link/ y alli
+// la app tiene que arrancar igual, sin receptor.
 import { createLabLookup } from "./lab-lookup.mjs";
 import { createHospitalServer } from "./app.mjs";
 import { loadAuthConfig } from "./auth.mjs";
@@ -31,7 +32,14 @@ for (const [key, value] of Object.entries(readJson(resolve(root, "server", "ai-c
 
 const mailRunner = createMailRunner({ root, dataDir });
 const authConfig = loadAuthConfig();
-const waLink = createWaLink({ root, dataDir });
+const waLink = await (async () => {
+  try {
+    const { createWaLink } = await import("./wa-link/supervisor.mjs");
+    return createWaLink({ root, dataDir });
+  } catch {
+    return { start() {}, stop() {}, status: () => ({ estado: "NO_INSTALADO" }) };
+  }
+})();
 const photoIntake = createPhotoIntake({ root, dataDir, ai: aiConfig(), waLink, internacionFile, lab: createLabLookup({ root }) });
 // Clima: se actualiza cada 10 minutos aunque nadie tenga la pantalla abierta, para detectar los cambios de nivel.
 // No se ejecutan avisos automáticos al cambiar de nivel.
