@@ -6,6 +6,28 @@ de respaldo completa ni una app operativa hasta importar su informacion privada.
 
 ## Despliegue propuesto
 
+### Desde el repositorio de GitHub
+
+El Dockerfile original de esta carpeta sirve solo para el paquete precompilado.
+Para compilar desde GitHub usar `deploy/render/Dockerfile.github` con el contexto
+en la raiz del repositorio. Ese archivo instala las dependencias de compilacion,
+ejecuta el empaquetador y copia solo su salida limpia a la imagen final.
+
+Formulario New Web Service:
+- Language: Docker.
+- Branch: despliegue-render.
+- Root Directory: vacio.
+- Dockerfile Path: deploy/render/Dockerfile.github.
+- Docker Build Context Directory: raiz del repositorio (vacio si el formulario
+  ya usa la raiz por defecto; no apuntar a deploy/render).
+- Docker Command: vacio; se usa el CMD del archivo.
+- Health Check Path: /api/health.
+- Disco: /var/data, 2 GB; requiere instancia de pago.
+
+La imagen inicia en preparacion. No cargar claves todavia para este primer
+despliegue. Verificar health con operational:false; esto comprueba solo la
+infraestructura y no constituye la habilitacion de la aplicacion ni sus datos.
+
 Un servicio Docker con Node 24 y Python 3, una instancia, disco persistente de 2 GB
 en `/var/data`, direccion HTTPS del proveedor y despliegues manuales.
 Plan propuesto `0.5c-512mb`: 7 USD/mes + 0,50 USD/mes por disco, sujeto a confirmar

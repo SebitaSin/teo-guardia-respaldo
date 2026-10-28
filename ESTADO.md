@@ -405,3 +405,26 @@ el repositorio publico no recibe esta actualizacion. La verificacion compara
 commit, arbol e inventario remoto con los archivos fuente y comprueba otra vez
 la privacidad. Evidencia local: outputs/github-respaldo-20261028-verificacion.json.
 Los procesos de la app y del enlace del personal no necesitan reiniciarse.
+
+### 28/10/2026 - Formulario de Render desde GitHub (punto 8)
+
+Tras el respaldo privado, Sebastian pidio hacer publico teo-guardia-respaldo.
+Se aplico a ese repositorio y se comprobo su acceso anonimo, con los 432 archivos
+del respaldo. No se agregaron claves ni datos privados.
+
+Las capturas del formulario muestran Language=Node, build con npm y plan Free
+en dos capturas, y 7 USD en la restante. No se puede desplegar ese formulario
+como si el repositorio incluyera los datos privados o el runtime precompilado.
+Nuevo deploy/render/Dockerfile.github: compilacion en una etapa separada desde
+package-lock, empaquetador limpio, imagen final Node24/Python3/Pillow y arranque
+en preparacion. El Dockerfile anterior sigue siendo para el paquete compilado.
+deploy/render/LEEME.md detalla Dockerfile Path, contexto raiz, disco y health.
+
+Probado localmente desde la copia limpia de GitHub sin los siete JSON privados:
+npm ci (226 paquetes), empaquetador/compilacion (217 archivos), hashes del
+paquete, ausencia de los 2.232 identificadores privados revisados en frontend,
+aislamiento de preparacion y bloqueo de produccion sin importacion validada.
+Sin probar: construccion Docker/Linux en Render (Docker no instalado en esta PC),
+RAM con ingesta, importacion de datos y operacion real cloud. No se detuvo ni
+reinicio la app local. Se prepara rama despliegue-render sin alterar el respaldo
+fechado. Backup de ESTADO y LEEME en _backups/20261028-render-github.
