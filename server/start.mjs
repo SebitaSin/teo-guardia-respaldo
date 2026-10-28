@@ -2,7 +2,9 @@ import { resolve } from "node:path";
 import { mkdirSync } from "node:fs";
 import { appendAudit, readJson, writeJsonAtomic } from "./store.mjs";
 import { verifyOpenAi } from "./ai.mjs";
-// WhatsApp: exclusivamente Cloud API oficial. No iniciar el receptor vinculado.
+// WhatsApp: Cloud API oficial para envios. El receptor vinculado se mantiene
+// encendido porque es el unico camino que recibe las pizarras de los grupos.
+import { createWaLink } from "./wa-link/supervisor.mjs";
 import { createLabLookup } from "./lab-lookup.mjs";
 import { createHospitalServer } from "./app.mjs";
 import { loadAuthConfig } from "./auth.mjs";
@@ -29,7 +31,7 @@ for (const [key, value] of Object.entries(readJson(resolve(root, "server", "ai-c
 
 const mailRunner = createMailRunner({ root, dataDir });
 const authConfig = loadAuthConfig();
-const waLink = null;
+const waLink = createWaLink({ root, dataDir });
 const photoIntake = createPhotoIntake({ root, dataDir, ai: aiConfig(), waLink, internacionFile, lab: createLabLookup({ root }) });
 // Clima: se actualiza cada 10 minutos aunque nadie tenga la pantalla abierta, para detectar los cambios de nivel.
 // No se ejecutan avisos automáticos al cambiar de nivel.
@@ -39,13 +41,14 @@ weatherTimer.unref();
 setTimeout(() => { weatherWatch.refresh().catch(() => undefined); }, 15_000).unref();
 const server = createHospitalServer({ distDir, dataDir, catalogFile, internacionFile, authConfig, waConfig: whatsappConfig(), ai: aiConfig(), maps: mapsConfig(), mailRunner, photoIntake, weatherWatch });
 photoIntake.start();
+waLink.start();
 // Prueba de modelos de IA, sólo si se pidió en ai-config.json: corre una vez, en segundo plano, y no cambia lo publicado.
 if (String(process.env.AI_COMPARE ?? "").toLowerCase() === "true") setTimeout(() => { import("./ai-compare.mjs").then((mod) => mod.runComparison({ dataDir, config: aiConfig(), internacionFile })).then((result) => appendAudit(dataDir, { actor: "system", action: "ai_model_comparison", kind: "system", ok: result.ok, repetida: Boolean(result.repetida), motivo: result.motivo ?? null })).catch((error) => appendAudit(dataDir, { actor: "system", action: "ai_model_comparison_failed", kind: "system", error: String(error?.message ?? "error").slice(0, 80) })); }, 45_000).unref();
 
 if (aiConfig().enabled) verifyOpenAi(aiConfig()).then((result) => writeJsonAtomic(resolve(dataDir, "ai", "status.json"), { ...result, at: new Date().toISOString() })).catch(() => undefined);
 const stopSchedule = scheduleMailSync(mailRunner);
 const stopWhatsAppDrafts = () => {}; // Sin programación automática de mensajes.
-server.once("close", () => { stopSchedule(); stopWhatsAppDrafts(); photoIntake.stop();  });
+server.once("close", () => { stopSchedule(); stopWhatsAppDrafts(); photoIntake.stop(); waLink.stop(); });
 server.listen(port, host, () => {
   process.stdout.write(`Hospital Schestakow listo en http://${host}:${port}\n`);
 });

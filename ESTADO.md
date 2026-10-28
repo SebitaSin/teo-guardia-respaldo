@@ -158,12 +158,27 @@ Sin empezar. Dependen de nómina con teléfonos y domicilios confirmados, de la 
 
 ## Registro de cambios
 
-### 2026-10-28 — Render: falta `service-labels.json` en el paquete
-- Responde a: publicar Guardia en un servidor de internet con dominio (OBJETIVO.md).
-- Qué: `deploy/render/prepare-package.mjs` copiaba de `src/data/` sólo `bed-capacity.mjs` y `departments.ts`. `server/staff-groups.mjs` lee `../src/data/service-labels.json` al importarse, así que el contenedor moría con `ENOENT: /app/src/data/service-labels.json` y el deploy salía con estado 1.
-- Cambio: se agrega `service-labels.json` a esa lista. Un archivo de 155 etiquetas de servicio, sin datos de pacientes ni personal.
-- Comprobado fuera de la PC real: el archivo es JSON válido y no lo alcanza el filtro de privados del empaquetador.
-- Sin probar todavía: el arranque completo en `GUARDIA_MODE=produccion` sobre Render.
+### 2026-10-28 — Se vuelve a encender el receptor vinculado de WhatsApp
+- Responde a: punto 3 del objetivo (entrada automatica de fotos de pizarras).
+- Hallazgo: las camas quedaron congeladas en el 23/10. Causa raiz: el 24/10 por la manana
+  `server/start.mjs` quedo con `const waLink = null;` y el comentario "No iniciar el receptor
+  vinculado". La ultima linea de `var/whatsapp-link/listener.log` es del 24/10 03:08 y
+  `status.json` quedo detenido en "CONECTADO" desde las 03:37. La sesion de WhatsApp sigue
+  valida: no se desvinculo nada, se apago el proceso desde el codigo.
+- Cambio: en `server/start.mjs` se importa `createWaLink` de `./wa-link/supervisor.mjs`,
+  se crea con `{ root, dataDir }`, se llama `waLink.start()` junto a `photoIntake.start()`
+  y `waLink.stop()` al cerrar el servidor. Cuatro lineas.
+- Comprobado fuera de la PC real: `node --check` pasa; `node --test server/*.test.mjs` da
+  99 pasan y 7 fallan, identico a antes del cambio (sin regresion). Los 7 fallos son previos:
+  app, autogestion, bed-capacity, live-catalog, manual-duty, messaging-security y la prueba
+  de bloqueo por proxy.
+- Sin probar: el arranque real en la PC y la entrada efectiva de fotos nuevas. Hace falta
+  reiniciar el servidor y verificar que `var/whatsapp-link/status.json` vuelva a actualizarse.
+- Pendiente de decision: esto revierte una decision tomada el 24/10 de usar solo Cloud API.
+  La Cloud API no recibe mensajes de grupos y las pizarras llegan por los tres grupos, por eso
+  el receptor vinculado es hoy el unico camino. Queda como medida temporal hasta resolver si
+  los secretarios mandan las fotos al numero de la app en vez del grupo.
+- Copia previa en `_backups/2026-10-28-receptor-whatsapp/`.
 
 
 - 2026-10-26 · Punto 4 · Codex. **Invitación integrada para WhatsApp:** por indicación expresa de Sebastián se agregó HOSPITAL SCHESTAKOW a la tarjeta con el mapa, 22%, tiempo aproximado de un minuto y URL completa. Imagen revisada y guardada en `outputs/invitacion-whatsapp-hospital-schestakow.png`; las versiones anteriores se conservan. Material preparado, sin envío a empleados ni cambios en la app. Respaldo de este registro en `_backups/2026-10-26-invitacion-datos/ESTADO-antes-hospital.md`.
@@ -436,3 +451,30 @@ Sin probar: construccion Docker/Linux en Render (Docker no instalado en esta PC)
 RAM con ingesta, importacion de datos y operacion real cloud. No se detuvo ni
 reinicio la app local. Se prepara rama despliegue-render sin alterar el respaldo
 fechado. Backup de ESTADO y LEEME en _backups/20261028-render-github.
+
+### 28/10/2026 - Render conectado y construccion cloud comprobada (punto 8)
+
+Sebastian confirmo expresamente Sebas's workspace. La integracion permite leer
+servicios, registros y despliegues; no expone cambio de rama/configuracion del
+servicio existente salvo variables. Teo Direccion, srv-dbh2jujbc2fs73eimahg,
+usa Docker, plan free, Virginia, contexto raiz, health /api/health y Dockerfile
+deploy/render/Dockerfile.github. La unica causa del fallo era la rama antigua:
+respaldo-teo-guardia-2026-10-28 en a508c7d, sin ese Dockerfile.
+
+Se avanzo esa rama por fast-forward al commit probado 93cf3b4, conservando el
+respaldo original ademas como etiqueta respaldo-original-2026-10-28. No se cambio
+ningun archivo de ejecucion local. El push disparo automaticamente un solo deploy
+dep-dbh2qojbc2fs738g2390; no se disparo un segundo despliegue manual.
+
+Comprobado realmente en Render: npm/compilacion/empaquetado y construccion de la
+imagen Linux terminaron; deploy live a las 17:14:57 UTC. Acceso HTTPS externo:
+/api/health=200 con operational:false y stage:preparacion; /, /login y
+/api/bootstrap=503 con pagina de preparacion y no-store. URL:
+https://teo-direccion.onrender.com. Eso comprueba infraestructura, NO app operativa.
+La app local conserva health=200. No se detuvo ni reinicio el servicio original.
+
+No se importaron datos, usuarios ni claves al servicio Free. Siguen pendientes
+almacenamiento persistente, importacion privada/corte final coordinado y pruebas
+funcionales cloud. Se consulta si autoriza servidor de 7 USD y disco de 2GB
+(0,50 USD/mes), o si mantiene Free solo en preparacion. La eleccion previa Free
+no se cambia sin respuesta. Backup previo: _backups/20261028-render-conectado.
