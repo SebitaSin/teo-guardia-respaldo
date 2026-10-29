@@ -4,6 +4,8 @@ Leer antes de tocar nada: `OBJETIVO.md` y `ESTADO.md`.
 
 ## Autorización actual
 
+28/10/2026: Sebastián autoriza a Codex a reparar la aplicación y completar el traslado privado a Render sin copiar comandos entre chats. Alcance de esta reparación: `deploy/render/prepare-package.mjs`, `deploy/render/Dockerfile.github`, `deploy/render/Dockerfile`, `server/start.mjs`, sus comprobaciones y el registro de `ESTADO.md`. Se conserva una sola fuente local y se trasladan datos y sesiones sólo al disco privado del servicio existente. La marca privada `server/runtime-owner.local.json` impide reiniciar correo y receptor en la PC después del corte a Render. No habilita nuevos gastos ni mensajes a terceros.
+
 24/10/2026: Sebastián pidió expresamente a Codex auditar y corregir este proyecto existente, probar WhatsApp oficial y preparar guardia.grok.me. Esta sesión modifica únicamente los archivos registrados en ESTADO.md; no crea otro proyecto. No se habilitan avisos automáticos.
 
 26/10/2026: Sebastián autoriza expresamente **reclamos automáticos por correo de los cronogramas mensuales**, una vez por día desde cuatro días antes del inicio del mes. Se detienen al identificar la planilla recibida de ese servicio y mes; la interfaz mantiene Suspender reclamo y permite cambiar el correo del responsable. Esta autorización reemplaza la prohibición anterior sólo para estos reclamos. No habilita avisos de clima, envíos automáticos por WhatsApp ni otras comunicaciones. Los destinatarios salen de los remitentes anteriores del servicio o de una corrección explícita hecha desde Cambiar datos.

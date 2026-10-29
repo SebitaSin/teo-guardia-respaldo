@@ -8,6 +8,7 @@ COPY dist ./dist
 COPY server ./server
 COPY scripts ./scripts
 COPY src ./src
+RUN npm ci --omit=dev --no-audit --no-fund --prefix server/wa-link
 ENV NODE_ENV=production APP_ROOT=/app APP_HOST=0.0.0.0 \
     APP_DATA_DIR=/var/data/runtime APP_PRIVATE_DIR=/var/data/private \
     APP_COOKIE_SECURE=true APP_TRUST_PROXY=true \

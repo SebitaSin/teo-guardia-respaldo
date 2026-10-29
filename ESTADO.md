@@ -478,3 +478,11 @@ almacenamiento persistente, importacion privada/corte final coordinado y pruebas
 funcionales cloud. Se consulta si autoriza servidor de 7 USD y disco de 2GB
 (0,50 USD/mes), o si mantiene Free solo en preparacion. La eleccion previa Free
 no se cambia sin respuesta. Backup previo: _backups/20261028-render-conectado.
+
+### 28/10/2026 - Codex: reparar el paquete cloud y preparar corte de procesos (puntos 2, 3, 4 y 8)
+
+Autorizacion expresa de Sebastian para reparar y trasladar sin copiar comandos entre chats. Se incluye el receptor vinculado y sus manifiestos de dependencias en el paquete reducido; Docker instala las dependencias bloqueadas existentes. No se incluyen sesiones ni datos privados en el codigo. La marca privada server/runtime-owner.local.json permite desactivar correo y receptor en la PC despues del corte, conservando el servidor HTTP.
+
+Comprobado: paquete limpio compilado; comprobacion de identificadores privados sin coincidencias; dependencias del receptor instaladas e importadas en Linux; arranque de produccion del paquete reducido en Linux contra copia privada aislada; directorio autenticado legible; receptor instalado sin vincular; segundo arranque con marca de traslado bloquea el correo local. Correo y fichas de personal del servicio real fueron comprobados por SSH sin imprimir datos personales. El token de Meta es rechazado por vencimiento.
+
+Archivos: REGLAS.md, deploy/render/prepare-package.mjs, deploy/render/Dockerfile.github, deploy/render/Dockerfile y server/start.mjs. Pendientes al registrar: publicar este cambio, trasladar/verificar la sesion y comprobar recepcion real en Render; renovar Meta; coordinar el corte local. No se habilitan gastos nuevos ni mensajes a terceros.

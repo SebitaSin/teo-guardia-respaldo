@@ -20,6 +20,7 @@ if (build.status !== 0) throw new Error('La compilacion aislada fallo; consultar
 for (const entry of readdirSync(join(root, 'server'), { withFileTypes: true })) {
   if (entry.isFile() && entry.name.endsWith('.mjs') && !entry.name.endsWith('.test.mjs')) copy('server/' + entry.name);
 }
+for (const name of ['supervisor.mjs', 'listener.mjs', 'package.json', 'package-lock.json']) copy('server/wa-link/' + name);
 for (const name of ['autogestion-client.js', 'autogestion-page.html', 'board-templates.json', 'lab-services.json']) copy('server/' + name);
 for (const name of ['imap_sync', 'ingest_pending', 'pdfgrid', 'photo_reader', 'schedule_services', 'reclamos']) copy(`scripts/${name}.py`);
 copy('scripts/vendor');

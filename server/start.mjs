@@ -22,6 +22,8 @@ const dataDir = resolve(process.env.APP_DATA_DIR || resolve(root, "var"));
 const distDir = resolve(process.env.APP_DIST_DIR || resolve(root, "dist"));
 const catalogFile = resolve(process.env.APP_CATALOG_FILE || resolve(root, "src", "data", "catalog.json"));
 const internacionFile = resolve(process.env.APP_INTERNACION_FILE || resolve(root, "src", "data", "internacion.json"));
+const backgroundMoved = readJson(resolve(root, "server", "runtime-owner.local.json"), {}).owner === "render";
+if (backgroundMoved) process.env.GMAIL_SYNC_ENABLED = "false";
 // Replit injects PORT and only exposes services bound to 0.0.0.0.
 // Local secure launches can still pin APP_HOST/APP_PORT explicitly.
 const host = process.env.APP_HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
@@ -30,9 +32,10 @@ mkdirSync(dataDir, { recursive: true, mode: 0o700 });
 // Parámetros no secretos de la lectura de pizarras por IA (la clave nunca va en este archivo).
 for (const [key, value] of Object.entries(readJson(resolve(root, "server", "ai-config.json"), {}))) { if (/^(AI_|OPENAI_MODEL$)/.test(key)) process.env[key] ??= String(value); }
 
-const mailRunner = createMailRunner({ root, dataDir });
+const mailRunner = backgroundMoved ? null : createMailRunner({ root, dataDir });
 const authConfig = loadAuthConfig();
 const waLink = await (async () => {
+  if (backgroundMoved) return { start() {}, stop() {}, status: () => ({ estado: "TRASLADADO_A_RENDER" }) };
   try {
     const { createWaLink } = await import("./wa-link/supervisor.mjs");
     return createWaLink({ root, dataDir });
