@@ -505,3 +505,4 @@ Probado fuera: los dos archivos de texto reales leidos completos; rangos de odon
 ### 04/11/2026 - Claude: la relectura de fotos no puede perder una planilla que ya se leia (punto 2)
 
 Comprobado en Render: tras PROMPT_VERSION 2, la foto de Diagnostico por Imagenes noviembre y la de UTI octubre quedaron sin leer (antes se leian). Arreglo en photo_reader.transcribe y read_photo: si la consulta nueva falla se conserva la lectura anterior y se marca vigente (no se vuelve a pagar el intento); si la nueva no pasa los controles se usa la anterior. Probado fuera con lecturas simuladas. Limite: si la lectura anterior ya fue reemplazada por una nueva que no pasa, esa foto necesita otra revision.
+- 04/11/2026 - Claude. server/app.mjs: /api/catalog/live incluye el motivo de cada archivo sin leer (reason), para poder mostrarlo y diagnosticar sin entrar al servidor. Sin cambio de pantalla todavia.
