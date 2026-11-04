@@ -415,6 +415,39 @@ def parse_calendar_grid(table: list[list[str]]) -> tuple[list[Entry], list[str]]
     return entries, notes
 
 
+def parse_unnumbered_grid(table: list[list[str]], year: int, month: int) -> list[Entry]:
+    """Calendario LUNES..DOMINGO sin números de día: cada fila es una semana del mes indicado.
+    Sólo se acepta si la forma coincide exactamente con el mes (primera y última semana)."""
+    for index, row in enumerate(table):
+        found = {i: _weekday_of(c) for i, c in enumerate(row) if _weekday_of(c) is not None and len(fold(c)) <= 12}
+        if len(found) == 7 and len(set(found.values())) == 7:
+            break
+    else:
+        return []
+    cols = sorted(found)
+    if any(b != a + 1 or found[b] != (found[a] + 1) % 7 for a, b in zip(cols, cols[1:])):
+        return []
+    rows = [r for r in table[index + 1:] if any(c.strip() for c in r)]
+    days_in = calendar.monthrange(year, month)[1]
+    start = [found[c] for c in cols].index(date(year, month, 1).weekday())
+    if len(rows) != (start + days_in + 6) // 7:
+        return []
+    entries: list[Entry] = []
+    for r, row in enumerate(rows):
+        for pos, col in enumerate(cols):
+            cell = row[col] if col < len(row) else ""
+            if not cell.strip():
+                continue
+            day = r * 7 + pos - start + 1
+            if not 1 <= day <= days_in or re.match(r"^\s*\d{1,2}(?!\d)", cell):
+                return []
+            lines = _clean_lines(cell.split("\n"))
+            if lines:
+                entries.append((day, lines, found[col]))
+    days = {d for d, _, _ in entries}
+    return entries if 1 in days and days_in in days else []
+
+
 def parse_range_list(table: list[list[str]]) -> list[tuple[int, int, int | None, int | None, list[str]]]:
     """Filas "1 AL 4 | NOMBRE". Devuelve (día inicial, día final, mes inicial, mes final, nombres)."""
     out = []
@@ -451,7 +484,8 @@ def parse_day_list(table: list[list[str]]) -> list[Entry]:
                 last = int(cell)
         if len(rows) > len(best_rows):
             best_col, best_rows = col, rows
-    if best_col is None or len(best_rows) < 10:
+    weekly = len(best_rows) >= 3 and all(int(table[b][best_col]) - int(table[a][best_col]) == 7 for a, b in zip(best_rows, best_rows[1:]))
+    if best_col is None or (len(best_rows) < 10 and not weekly):
         return []
     header = table[best_rows[0] - 1] if best_rows[0] > 0 else []
     entries: list[Entry] = []
@@ -715,6 +749,16 @@ def read_attachment(path: Path, item: dict) -> dict:
         grid, grid_notes = parse_calendar_grid(table)
         if grid:
             entries.extend(grid); notes.extend(grid_notes); layout = "grilla"
+    if not entries and not pdf_entries:
+        grid_month, grid_year = explicit_month(hint)
+        if grid_month:
+            base = mail_day(item) or date.today()
+            grid_year = grid_year or base.year + (1 if grid_month < base.month - 6 else 0)
+            for table in tables:
+                found = parse_unnumbered_grid(table, grid_year, grid_month)
+                if found:
+                    entries.extend(found); layout = "grilla"
+                    notes.append("Días asignados por la posición de cada semana en el calendario del mes.")
     if not entries:
         for table in tables:
             ranges.extend(parse_range_list(table))
@@ -1163,7 +1207,7 @@ def mark_superseded(documents: list[dict]) -> None:
     Personas distintas = otro plantel del servicio (por ejemplo médicos y licenciados): se muestran ambos."""
     kept: dict[tuple, list[set[str]]] = {}
     for doc in documents:  # ya ordenados del más nuevo al más viejo
-        key = (doc["departments"][0], doc["year"], doc["month"])
+        key = (doc["departments"][0], doc["year"], doc["month"], len(doc.get("shifts") or []) < 10)
         mine = name_tokens(doc)
         clusters = kept.setdefault(key, [])
         same = any(mine and other and len(mine & other) / len(mine | other) >= 0.3 for other in clusters)

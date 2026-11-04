@@ -21,7 +21,7 @@ from pathlib import Path
 APP_ROOT = Path(os.environ.get("APP_ROOT", Path(__file__).resolve().parents[1])).resolve()
 DATA_DIR = Path(os.environ.get("APP_DATA_DIR", APP_ROOT / "var")).resolve()
 AI_DIR = DATA_DIR / "ai"
-PROMPT_VERSION = 1
+PROMPT_VERSION = 2  # 2: cada día puede traer su mes (rangos de fechas que cruzan dos meses)
 MAX_BYTES = 15 * 1024 * 1024
 MIN_DAYS = 10          # menos días que esto no es una planilla mensual confiable
 MAX_UNCLEAR = 0.6      # tope grueso; el control fino se hace después de comparar con planillas anteriores (ingest_pending)
@@ -36,8 +36,9 @@ SCHEMA = {
         "year": {"type": ["integer", "null"]},
         "legibility": {"type": "integer", "minimum": 0, "maximum": 100},
         "days": {"type": "array", "maxItems": 62, "items": {
-            "type": "object", "additionalProperties": False, "required": ["day", "people"],
+            "type": "object", "additionalProperties": False, "required": ["day", "month", "people"],
             "properties": {"day": {"type": "integer", "minimum": 1, "maximum": 31},
+                           "month": {"type": ["integer", "null"], "minimum": 1, "maximum": 12},
                            "people": {"type": "array", "maxItems": 30, "items": {
                                "type": "object", "additionalProperties": False, "required": ["name", "hours", "unclear"],
                                "properties": {"name": {"type": "string"}, "hours": {"type": ["string", "null"]}, "unclear": {"type": "boolean"}}}}}}},
@@ -52,6 +53,8 @@ PROMPT = (
     "con el formato HH-HH (por ejemplo 08-20, 20-08) o '24 hs'; si es una letra de turno (M, T, N) poné esa letra; si no hay, null. "
     "Si un nombre no se lee con seguridad, transcribí lo que se ve y marcá 'unclear': true. No inventes ni deduzcas nombres. "
     "'service' es el servicio tal como figura en el encabezado, o null si no figura. 'month' y 'year' sólo si están escritos. "
+    "Si la planilla indica rangos de fechas (por ejemplo 'del 26/10 al 01/11'), devolvé un elemento por cada día del rango "
+    "con la persona, y en 'month' el mes de ese día; si la planilla es de un solo mes con días sueltos, 'month' es null. "
     "'legibility' es de 0 a 100 qué tan legible es la planilla completa. Si la imagen no es una planilla de guardias, "
     "devolvé is_schedule false y days vacío."
 )
@@ -158,14 +161,19 @@ def to_shifts(reading: dict, mail_date: date | None, hint_month: int | None, hin
     year = year or base.year
     if abs((year * 12 + month) - (base.year * 12 + base.month)) > 1:
         return {"reason": "foto: el mes leído no coincide con la fecha del correo"}
-    days_in = calendar.monthrange(year, month)[1]
-    by_day: dict[int, list[str]] = {}
+    by_day: dict[date, list[str]] = {}
     people: dict[str, list[list]] = {}
     total = unclear = 0
     for row in reading.get("days") or []:
-        day = int(row.get("day") or 0)
-        if not 1 <= day <= days_in:
+        row_month = int(row.get("month") or 0) or month
+        row_year = year + (1 if row_month < month - 6 else -1 if row_month > month + 6 else 0)
+        try:
+            when = date(row_year, row_month, int(row.get("day") or 0))
+        except ValueError:
             continue
+        if abs((row_year * 12 + row_month) - (year * 12 + month)) > 1:
+            continue
+        iso = when.isoformat()
         for person in row.get("people") or []:
             name = " ".join(str(person.get("name") or "").split())
             if not name:
@@ -173,18 +181,18 @@ def to_shifts(reading: dict, mail_date: date | None, hint_month: int | None, hin
             total += 1
             hours = " ".join(str(person.get("hours") or "").split())
             entry = [name, hours, bool(person.get("unclear"))]
-            if entry not in people.setdefault(f"{year}-{month:02d}-{day:02d}", []):
-                people[f"{year}-{month:02d}-{day:02d}"].append(entry)
+            if entry not in people.setdefault(iso, []):
+                people[iso].append(entry)
             if person.get("unclear"):
                 unclear += 1
                 name = f"{name} (dudoso)"
             line = f"{name} {hours}".strip()
-            if line not in by_day.setdefault(day, []):
-                by_day[day].append(line)
+            if line not in by_day.setdefault(when, []):
+                by_day[when].append(line)
     filled = {day: lines for day, lines in by_day.items() if lines}
     if len(filled) < MIN_DAYS:
         return {"reason": "foto: se leyeron muy pocos días"}
     if total and unclear / total > MAX_UNCLEAR:
         return {"reason": "foto: demasiados nombres dudosos, no se publica"}
     return {"year": year, "month": month, "service": reading.get("service") or "", "unclear": unclear, "people": people,
-            "shifts": [{"date": f"{year}-{month:02d}-{day:02d}", "text": " · ".join(lines)} for day, lines in sorted(filled.items())]}
+            "shifts": [{"date": day.isoformat(), "text": " · ".join(lines)} for day, lines in sorted(filled.items())]}

@@ -493,3 +493,11 @@ Autorizacion de Sebastian por chat (04/11, con clave de confirmacion): leer solo
 Cambio: scripts/ingest_pending.py (read_scanned_pdf) usa la misma habilitacion que las fotos de planillas (AI_ENABLED y AI_ALLOW_SCHEDULE_PHOTOS); con la IA apagada sigue pidiendo aprobacion por archivo. En Render: GMAIL_SYNC_MINUTES=10.
 
 Probado fuera: con IA activa el PDF pasa a la lectura y con IA apagada queda trabado; pruebas Python 46 de 49 (las 3 que fallan ya fallaban: necesitan datos reales ausentes en el espejo). Sin probar: lectura real de los PDF de UCCyQ en Render. La carpeta local de la PC no tiene este cambio.
+
+### 04/11/2026 - Claude: tres formatos de planilla que quedaban sin leer (punto 2)
+
+Pedido de Sebastian: que al actualizar se lean solas. Motivos comprobados corriendo el lector sobre los adjuntos reales:
+- Salud Mental noviembre (.docx): calendario LUNES..DOMINGO sin numeros de dia. Nuevo parse_unnumbered_grid: asigna los dias por la posicion de cada semana, solo con mes escrito y si la forma coincide exacto con el mes (cantidad de semanas, dia 1 y ultimo dia). Con el archivo real: 30 dias, 1/11 domingo.
+- Obstetricia rotacion de sabados (.doc): lista FECHA | PROFESIONAL con 4 filas; se exigian 10. Ahora se acepta una lista corta si los dias van de 7 en 7. Con el archivo real: 7, 14, 21 y 28/11. Una planilla de menos de 10 dias ya no reemplaza al cronograma completo del mismo servicio y mes (mark_superseded).
+- Odontologia (foto/escaneo): rangos de fechas que cruzan de mes (13/10 al 15/11). La IA devolvia un solo mes y noviembre quedaba vacio. El esquema de la foto ahora trae el mes de cada dia (PROMPT_VERSION 2); to_shifts arma fechas completas. Al cambiar la version se vuelven a leer una vez las fotos de planillas ya guardadas (costo de IA por foto, dentro del tope mensual).
+Probado fuera: los dos archivos de texto reales leidos completos; rangos de odontologia simulados (34 dias, 4/11 = Figueroa); planilla de un mes sin cambios; Python 46 de 49 (las 3 de siempre, por datos ausentes). Sin probar: la relectura real de las fotos en Render.
