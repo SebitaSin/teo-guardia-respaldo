@@ -906,7 +906,10 @@ def read_scanned_pdf(path: Path, item: dict) -> dict:
         approved = json.loads((DATA_DIR / "ai" / "schedule-pdf-approvals.json").read_text("utf-8")).get("attachments", [])
     except (OSError, ValueError):
         approved = []
-    if not item.get("sha256") or item["sha256"] not in approved:
+    # Autorización general de Sebastián (4/11/2026): los PDF escaneados de planillas se leen
+    # con OpenAI igual que las fotos de planillas, sin aprobar archivo por archivo.
+    import photo_reader
+    if not photo_reader.config()["enabled"] and (not item.get("sha256") or item["sha256"] not in approved):
         return {"reason": "pdf escaneado: pendiente de autorización para lectura con OpenAI"}
     try:
         images = scanned_pdf_images(path, allow_embedded=True)
