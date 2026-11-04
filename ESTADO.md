@@ -486,3 +486,10 @@ Autorizacion expresa de Sebastian para reparar y trasladar sin copiar comandos e
 Comprobado: paquete limpio compilado; comprobacion de identificadores privados sin coincidencias; dependencias del receptor instaladas e importadas en Linux; arranque de produccion del paquete reducido en Linux contra copia privada aislada; directorio autenticado legible; receptor instalado sin vincular; segundo arranque con marca de traslado bloquea el correo local. Correo y fichas de personal del servicio real fueron comprobados por SSH sin imprimir datos personales. El token de Meta es rechazado por vencimiento.
 
 Archivos: REGLAS.md, deploy/render/prepare-package.mjs, deploy/render/Dockerfile.github, deploy/render/Dockerfile y server/start.mjs. Pendientes al registrar: publicar este cambio, trasladar/verificar la sesion y comprobar recepcion real en Render; renovar Meta; coordinar el corte local. No se habilitan gastos nuevos ni mensajes a terceros.
+### 04/11/2026 - Claude: lectura automatica de PDF escaneados y correo cada 10 minutos (punto 2)
+
+Autorizacion de Sebastian por chat (04/11, con clave de confirmacion): leer solos los PDF escaneados de planillas con OpenAI y corregir directo en GitHub. Causa encontrada en produccion: el correo funcionaba (revision completa, sin errores), pero cada PDF escaneado esperaba una aprobacion por archivo en var/ai/schedule-pdf-approvals.json que la app no permite dar; quedaban sin leer, entre ellos 3 de UCCyQ (28/10, 29/10 y 2/11). Ademas la revision corria una vez por dia (GMAIL_SYNC_MINUTES=1440).
+
+Cambio: scripts/ingest_pending.py (read_scanned_pdf) usa la misma habilitacion que las fotos de planillas (AI_ENABLED y AI_ALLOW_SCHEDULE_PHOTOS); con la IA apagada sigue pidiendo aprobacion por archivo. En Render: GMAIL_SYNC_MINUTES=10.
+
+Probado fuera: con IA activa el PDF pasa a la lectura y con IA apagada queda trabado; pruebas Python 46 de 49 (las 3 que fallan ya fallaban: necesitan datos reales ausentes en el espejo). Sin probar: lectura real de los PDF de UCCyQ en Render. La carpeta local de la PC no tiene este cambio.
