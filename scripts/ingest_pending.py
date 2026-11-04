@@ -977,6 +977,10 @@ def read_photo(path: Path, item: dict, image: bytes | None = None) -> dict:
     hint = " ".join([item.get("filename") or "", item.get("subject") or ""])
     hint_month, hint_year = explicit_month(hint)
     read = photo_reader.to_shifts(result["reading"], mail_day(item), hint_month, hint_year)
+    if "reason" in read and result.get("previous"):
+        earlier = photo_reader.to_shifts(result["previous"], mail_day(item), hint_month, hint_year)
+        if "reason" not in earlier:
+            read = earlier
     if "reason" in read:
         return read
     department = detect_department(read["service"]) or detect_department(hint) \

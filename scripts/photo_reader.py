@@ -127,9 +127,14 @@ def transcribe(path: Path, digest: str, call=_call_openai, image: bytes | None =
         return {"reason": "foto: tamaño de imagen no admitido"}
     try:
         parsed, tokens_in, tokens_out = call(cfg, image)
-    except urllib.error.HTTPError as exc:
-        return {"reason": f"foto: el servicio de IA respondió {exc.code}"}
     except Exception as exc:
+        if cached and cached.get("reading"):
+            # La lectura anterior sigue valiendo: se marca como vigente para no volver a pagar el mismo intento.
+            kept = {**cached, "promptVersion": PROMPT_VERSION, "keptFrom": cached.get("promptVersion")}
+            _save(cache_path, kept)
+            return kept
+        if isinstance(exc, urllib.error.HTTPError):
+            return {"reason": f"foto: el servicio de IA respondió {exc.code}"}
         return {"reason": f"foto: no se pudo consultar la IA ({type(exc).__name__})"}
     cost = tokens_in * cfg["in"] / 1_000_000 + tokens_out * cfg["out"] / 1_000_000
     usage = _load(usage_path, usage)
@@ -139,6 +144,9 @@ def transcribe(path: Path, digest: str, call=_call_openai, image: bytes | None =
                        "outputTokens": usage["outputTokens"] + tokens_out, "estimatedUsd": usage["estimatedUsd"] + cost, "dias": dias})
     result = {"promptVersion": PROMPT_VERSION, "model": cfg["model"], "at": datetime.now().astimezone().isoformat(timespec="seconds"),
               "usage": {"inputTokens": tokens_in, "outputTokens": tokens_out, "estimatedUsd": cost}, "reading": parsed}
+    previous = (cached or {}).get("reading") or (cached or {}).get("previous")
+    if previous:
+        result["previous"] = previous  # si la lectura nueva no pasa los controles, se usa la anterior
     _save(cache_path, result)
     return result
 
