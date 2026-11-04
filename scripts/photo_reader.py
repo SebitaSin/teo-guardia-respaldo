@@ -107,7 +107,11 @@ def transcribe(path: Path, digest: str, call=_call_openai, image: bytes | None =
     cache_path = AI_DIR / "schedule-cache" / f"{digest}.json"
     cached = _load(cache_path, None)
     if cached and cached.get("promptVersion") == PROMPT_VERSION:
-        return cached
+        reading = cached.get("reading") or {}
+        # La legibilidad la estima la propia IA y varía entre lecturas: una planilla rechazada sólo por eso
+        # se vuelve a leer una única vez; el tope de legibilidad no cambia.
+        if not (reading.get("is_schedule") and int(reading.get("legibility") or 0) < 60 and not cached.get("retried")):
+            return cached
     cfg = config()
     if not cfg["enabled"]:
         return {"reason": "foto: lectura por IA no habilitada"}
@@ -144,6 +148,8 @@ def transcribe(path: Path, digest: str, call=_call_openai, image: bytes | None =
                        "outputTokens": usage["outputTokens"] + tokens_out, "estimatedUsd": usage["estimatedUsd"] + cost, "dias": dias})
     result = {"promptVersion": PROMPT_VERSION, "model": cfg["model"], "at": datetime.now().astimezone().isoformat(timespec="seconds"),
               "usage": {"inputTokens": tokens_in, "outputTokens": tokens_out, "estimatedUsd": cost}, "reading": parsed}
+    if cached and cached.get("promptVersion") == PROMPT_VERSION:
+        result["retried"] = True
     previous = (cached or {}).get("reading") or (cached or {}).get("previous")
     if previous:
         result["previous"] = previous  # si la lectura nueva no pasa los controles, se usa la anterior
